@@ -138,7 +138,7 @@
 <strong>搜尋</strong>
 <input id="searchInput" placeholder="姓名 / 電話 / 地址" style="width:220px" type="text"/>
 </div>
-<div class="right"><button class="accent" disabled="true" id="backupBtn" onclick="uploadBackupToDrive()">☁️Google</button>
+<div class="right"><button class="accent" id="gdriveBackupBtn">☁️Google</button>
 <button class="accent" id="newBtn">新增訂單</button>
 <button id="newExpenseBtn">新增花費</button>
 <button id="exportJson">匯出JSON</button>
@@ -1444,122 +1444,107 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 <script src="https://apis.google.com/js/api.js"></script>
-
-
 <script>
 const CLIENT_ID = '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+let tokenClient, gapiInited = false, gisInited = false;
 
-function initGoogleAPI() {
-  console.log("🔄 初始化 Google API 中...");
-  gapi.load('client:auth2', async () => {
-    try {
-      await gapi.client.init({
-        clientId: CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/drive.file'
-      });
-      console.log("✅ gapi.client.init 完成");
+function gdriveInit() {
+  gapi.load('client', async () => {
+    await gapi.client.init({ apiKey: '', discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"] });
+    gapiInited = true;
+  });
 
-      await gapi.client.load('drive', 'v3');
-      console.log("✅ gapi.client.drive 載入完成");
-
-      const isSignedIn = gapi.auth2.getAuthInstance().isSignedIn.get();
-      if (!isSignedIn) {
-        console.log("🔑 尚未登入，嘗試登入中...");
-        await gapi.auth2.getAuthInstance().signIn();
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: async (tokenResponse) => {
+      if (tokenResponse.error) {
+        alert('授權失敗');
+        return;
       }
-
-      document.getElementById("backupBtn").disabled = false;
-      document.getElementById("backupBtn").onclick = uploadBackupToDrive;
-      console.log("☁️ 備份按鈕已啟用");
-    } catch (e) {
-      console.error("❌ 初始化失敗：", e);
-      alert("Google API 初始化失敗，請檢查網路或 Client ID。");
+      uploadBackupToDrive();
     }
   });
 }
 
-async function uploadBackupToDrive() {
-  console.log("🚀 開始備份流程...");
-  try {
+function uploadBackupToDrive() {
+  const data = {
+    orders: JSON.parse(localStorage.getItem('yl_clean_orders_v1') || '[]'),
+    staffList: JSON.parse(localStorage.getItem('yl_clean_staff_v1') || '[]'),
+    contactList: JSON.parse(localStorage.getItem('yl_clean_contact_v1') || '[]'),
+    exportedAt: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const metadata = {
+    name: `清洗訂單_${new Date().toISOString().split('T')[0]}.json`,
+    mimeType: 'application/json'
+  };
+
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  form.append('file', blob);
+
+  fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
+    body: form
+  })
+  .then(res => res.json())
+  .then(res => {
+    if (res.id) alert('✅ 備份成功，上傳至你的 Google Drive！');
+    else alert('❌ 備份失敗：' + JSON.stringify(res));
+  })
+  .catch(err => {
+    console.error(err);
+    alert('❌ 備份發生錯誤');
+  });
+}
+
+document.getElementById('gdriveBackupBtn')?.addEventListener('click', () => {
+  if (!gapiInited) return alert('Google API 尚未初始化，請稍後再試');
+  tokenClient.requestAccessToken();
+});
+
+// 初始化
+window.onload = () => {
+  const script = document.createElement('script');
+  script.src = "https://accounts.google.com/gsi/client";
+  script.onload = () => {
+    gisInited = true;
+    gdriveInit();
+  };
+  document.body.appendChild(script);
+};
+    // 建立或取得「訂單排程備份」資料夾
     const folderName = "訂單排程備份";
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const hh = String(now.getHours()).padStart(2, '0');
-    const min = String(now.getMinutes()).padStart(2, '0');
-    const ss = String(now.getSeconds()).padStart(2, '0');
-    const timestamp = `${yyyy}-${mm}-${dd}_${hh}-${min}-${ss}`;
-    const fileName = `清洗訂單_${timestamp}.json`;
-
-    console.log("📦 準備備份檔案名稱：", fileName);
-    const content = localStorage.getItem("orders") || "[]";
-    const blob = new Blob([content], { type: "application/json" });
-
-    console.log("🔍 檢查是否已有資料夾：", folderName);
-    const folderResponse = await gapi.client.drive.files.list({
-      q: "mimeType='application/vnd.google-apps.folder' and name='" + folderName + "' and trashed = false",
-      fields: "files(id, name)",
-    });
-
     let folderId = null;
-    if (folderResponse.result.files && folderResponse.result.files.length > 0) {
-      folderId = folderResponse.result.files[0].id;
-      console.log("📁 找到資料夾 ID：", folderId);
-    } else {
-      console.log("📁 沒找到，建立資料夾中...");
-      const createFolder = await gapi.client.drive.files.create({
-        resource: {
-          name: folderName,
-          mimeType: "application/vnd.google-apps.folder",
-        },
-        fields: "id",
+    try {
+      const folderRes = await gapi.client.drive.files.list({
+        q: "mimeType='application/vnd.google-apps.folder' and name='" + folderName + "' and trashed = false",
+        fields: "files(id, name)",
       });
-      folderId = createFolder.result.id;
-      console.log("✅ 資料夾建立完成，ID：", folderId);
+      if (folderRes.result.files && folderRes.result.files.length > 0) {
+        folderId = folderRes.result.files[0].id;
+        console.log("📁 已找到資料夾 ID：", folderId);
+      } else {
+        const createFolder = await gapi.client.drive.files.create({
+          resource: {
+            name: folderName,
+            mimeType: "application/vnd.google-apps.folder",
+          },
+          fields: "id",
+        });
+        folderId = createFolder.result.id;
+        console.log("📁 資料夾已建立，ID：", folderId);
+      }
+    } catch (err) {
+      console.error("❌ 資料夾建立失敗：", err);
+      alert("❌ 建立備份資料夾失敗，請檢查權限。");
+      return;
     }
 
-    const metadata = {
-      name: fileName,
-      mimeType: "application/json",
-      parents: [folderId],
-    };
-
-    console.log("🧾 上傳中...");
-    const form = new FormData();
-    const boundary = "-------314159265358979323846";
-    const delimiter = "\r\n--" + boundary + "\r\n";
-    const close_delim = "\r\n--" + boundary + "--";
-
-    const multipartRequestBody =
-      delimiter +
-      "Content-Type: application/json\r\n\r\n" +
-      JSON.stringify(metadata) +
-      delimiter +
-      "Content-Type: application/json\r\n\r\n" +
-      await blob.text() +
-      close_delim;
-
-    const uploadResult = await gapi.client.request({
-      path: "/upload/drive/v3/files?uploadType=multipart",
-      method: "POST",
-      params: { uploadType: "multipart" },
-      headers: {
-        "Content-Type": "multipart/related; boundary=\"" + boundary + "\"",
-      },
-      body: multipartRequestBody,
-    });
-
-    console.log("✅ 備份完成：", uploadResult);
-    alert("✅ 備份成功，已上傳至 Google Drive「訂單排程備份」資料夾！");
-  } catch (error) {
-    console.error("❌ 備份過程中出錯：", error);
-    alert("❌ 備份失敗，請打開 DevTools 查看 Console 詳細錯誤。");
-  }
-}
-</script>
-<script async="" defer="" onload="initGoogleAPI()" src="https://apis.google.com/js/api.js"></script>
-</body>
+</script></body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
