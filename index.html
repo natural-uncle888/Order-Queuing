@@ -100,7 +100,7 @@
     details.accordion[open] > summary{border-bottom:1px solid var(--border)}
     details.accordion .content{padding:16px}
   </style>
-<script onload="handleClientLoad()" src="https://apis.google.com/js/api.js"></script><script onload="handleClientLoad()" src="https://apis.google.com/js/api.js"></script></head>
+<script src="https://apis.google.com/js/api.js"></script></head>
 <body>
 <header>
 <div class="wrap toolbar">
@@ -1443,7 +1443,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 </script>
-<script src="https://apis.google.com/js/api.js"></script>
+
 <script>function uploadBackupToDrive() {
     console.log("🔄 備份開始");
 
@@ -1527,83 +1527,38 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 }</script>
-<script>
-  const CLIENT_ID = "894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com";
-  const SCOPES = "https://www.googleapis.com/auth/drive.file";
 
-  const authorizeButton = document.getElementById("authorize_button");
-  const backupButton = document.getElementById("backup_button");
 
-  function handleClientLoad() {
-    console.log("📦 GAPI 載入中...");
-    gapi.load("client:auth2", initClient);
-  }
-
-  function initClient() {
-    gapi.client.init({
-      clientId: CLIENT_ID,
-      scope: SCOPES,
-    }).then(function () {
-      console.log("✅ Google API 初始化完成");
-
-      // 綁定登入按鈕事件
-      document.getElementById("authorize_button").onclick = function () {
-        gapi.auth2.getAuthInstance().signIn().then(function () {
-          console.log("🔐 已登入 Google 帳號");
-          document.getElementById("backup_button").disabled = false;
-        });
-      };
-
-      // 若已登入則啟用備份
-      if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
-        document.getElementById("backup_button").disabled = false;
-      } else {
-        document.getElementById("backup_button").disabled = true;
-      }
-    }, function(error) {
-      console.error("❌ 初始化失敗：", error);
-      alert("Google API 初始化失敗，請檢查 client_id 設定與網路連線");
-    });
-  }
-
-  window.onload = function () {
-    document.getElementById("backup_button").disabled = true;
-  };
-</script>
 
 <script>
-const CLIENT_ID = "894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com";
-const SCOPES = "https://www.googleapis.com/auth/drive.file";
-
+let CLIENT_ID = "894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com";
+let SCOPES = "https://www.googleapis.com/auth/drive.file";
 let gapiInitialized = false;
 let driveReady = false;
 
-// 自動載入並初始化 gapi
-function handleClientLoad() {
-  gapi.load("client:auth2", initClient);
-}
+// 頁面載入完再執行初始化
+window.onload = () => {
+  console.log("🌐 載入 gapi...");
+  gapi.load("client:auth2", () => {
+    gapi.client.init({
+      clientId: CLIENT_ID,
+      scope: SCOPES,
+    }).then(() => {
+      gapiInitialized = true;
+      console.log("✅ Google API 初始化完成");
 
-function initClient() {
-  gapi.client.init({
-    clientId: CLIENT_ID,
-    scope: SCOPES,
-  }).then(function () {
-    gapiInitialized = true;
-    console.log("✅ Google API 初始化完成");
-
-    // 若已登入則啟用備份按鈕
-    if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
-      driveReady = true;
-      document.getElementById("backup_button").disabled = false;
-    }
-  }, function(error) {
-    console.error("❌ Google API 初始化失敗", error);
-    alert("Google API 初始化失敗，請檢查 client_id 或網路連線。");
+      // 若已登入則開啟備份按鈕
+      if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
+        driveReady = true;
+        document.getElementById("backup_button").disabled = false;
+      }
+    }, (err) => {
+      console.error("❌ 初始化失敗", err);
+      alert("Google API 初始化失敗，請檢查 client_id 設定與網路。");
+    });
   });
-}
 
-// 修改備份按鈕行為：自動登入 + 備份
-document.addEventListener("DOMContentLoaded", function () {
+  // 備份按鈕點擊行為
   const btn = document.getElementById("backup_button");
   if (btn) {
     btn.addEventListener("click", async function () {
@@ -1616,20 +1571,19 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           await gapi.auth2.getAuthInstance().signIn();
           driveReady = true;
-          console.log("🔐 已成功登入 Google 帳戶");
+          console.log("🔐 已登入 Google");
         } catch (e) {
           alert("❌ Google 登入失敗：" + e.error);
           return;
         }
       }
 
-      // 登入後才執行備份
       if (driveReady) {
         uploadBackupToDrive();
       }
     });
   }
-});
+};
 </script>
 </body>
 </html>
