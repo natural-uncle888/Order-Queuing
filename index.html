@@ -1472,6 +1472,70 @@ function gdriveInit() {
 
 // 上傳備份到 Google Drive
 function uploadBackupToDrive() {
+    const folderName = "訂單排程備份";
+
+    function ensureFolderExists(callback) {
+        gapi.client.drive.files.list({
+            q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+            fields: 'files(id, name)'
+        }).then(function(response) {
+            const files = response.result.files;
+            if (files && files.length > 0) {
+                callback(files[0].id);
+            } else {
+                const folderMetadata = {
+                    name: folderName,
+                    mimeType: 'application/vnd.google-apps.folder'
+                };
+                gapi.client.drive.files.create({
+                    resource: folderMetadata,
+                    fields: 'id'
+                }).then(function(folder) {
+                    callback(folder.result.id);
+                });
+            }
+        });
+    }
+
+    ensureFolderExists(function(folderId) {
+        const now = new Date();
+        const dateStr = now.getFullYear() + '-' +
+                        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                        String(now.getDate()).padStart(2, '0') + '_' +
+                        String(now.getHours()).padStart(2, '0') + '-' +
+                        String(now.getMinutes()).padStart(2, '0') + '-' +
+                        String(now.getSeconds()).padStart(2, '0');
+
+        const metadata = {
+            name: `清洗訂單_${dateStr}.json`,
+            mimeType: 'application/json',
+            parents: [folderId]
+        };
+
+        const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+        const blob = new Blob([JSON.stringify(orders, null, 2)], { type: 'application/json' });
+        const file = new File([blob], metadata.name, { type: 'application/json' });
+
+        const accessToken = gapi.auth.getToken().access_token;
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', file);
+
+        fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+            method: 'POST',
+            headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
+            body: form,
+        })
+        .then((res) => res.json())
+        .then(function(file) {
+            alert("✅ 備份完成！已儲存至 Google Drive 資料夾。");
+        })
+        .catch((error) => {
+            console.error("❌ 備份失敗", error);
+            alert("❌ 備份失敗，請查看開發者工具。");
+        });
+    });
+}
   const data = {
     orders: JSON.parse(localStorage.getItem('yl_clean_orders_v1') || '[]'),
     staffList: JSON.parse(localStorage.getItem('yl_clean_staff_v1') || '[]'),
