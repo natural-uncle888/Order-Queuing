@@ -5,7 +5,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <title>清洗訂單排程系統</title>
-<link rel="icon" type="image/png" href="https://res.cloudinary.com/dijzndzw2/image/upload/v1757176751/logo-3_hddq08.png"/>
+<link href="https://res.cloudinary.com/dijzndzw2/image/upload/v1757176751/logo-3_hddq08.png" rel="icon" type="image/png"/>
 <style>
     :root{
       --bg:#f7f7fb;
@@ -138,9 +138,9 @@
 <strong>搜尋</strong>
 <input id="searchInput" placeholder="姓名 / 電話 / 地址" style="width:220px" type="text"/>
 </div>
-<div class="right">
+<div class="right"><button class="accent" id="gdriveBackupBtn">☁️Google</button>
 <button class="accent" id="newBtn">新增訂單</button>
-        <button id="newExpenseBtn">新增花費</button>
+<button id="newExpenseBtn">新增花費</button>
 <button id="exportJson">匯出JSON</button>
 <button id="exportXlsx">匯出Excel</button>
 <button class="warn" id="importJson">匯入JSON</button>
@@ -148,7 +148,6 @@
 </div>
 </div>
 </header>
-
 <main class="wrap stack" style="margin-top:16px">
 <!-- 訂單列表（上） -->
 <section class="card">
@@ -187,7 +186,7 @@
 </div>
 </section>
 <!-- 訂單表單（中） -->
-<details class="accordion" id="orderAccordion" ="True"><summary><span id="formTitle">新增 / 編輯訂單</span></summary><div class="content">
+<details ="true"="" class="accordion" id="orderAccordion"><summary><span id="formTitle">新增 / 編輯訂單</span></summary><div class="content">
 <form id="orderForm">
 <input id="id" type="hidden"/>
 <div class="row">
@@ -380,7 +379,7 @@
 </form>
 </div></details>
 <!-- 支出模組（下）以手風琴呈現 -->
-<details class="accordion" id="expenseAcc" ="">
+<details =""="" class="accordion" id="expenseAcc">
 <summary>本月花費（可展開/收合）</summary>
 <div class="content">
 <div class="two-col">
@@ -1444,9 +1443,82 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 </script>
-</body>
-</html>
+<script src="https://apis.google.com/js/api.js"></script>
 
+<script>
+const CLIENT_ID = '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+let tokenClient, gapiInited = false, gisInited = false;
+
+function gdriveInit() {
+  gapi.load('client', async () => {
+    await gapi.client.init({ apiKey: '', discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"] });
+    gapiInited = true;
+  });
+
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: async (tokenResponse) => {
+      if (tokenResponse.error) {
+        alert('授權失敗');
+        return;
+      }
+      uploadBackupToDrive();
+    }
+  });
+}
+
+function uploadBackupToDrive() {
+  const data = {
+    orders: JSON.parse(localStorage.getItem('yl_clean_orders_v1') || '[]'),
+    staffList: JSON.parse(localStorage.getItem('yl_clean_staff_v1') || '[]'),
+    contactList: JSON.parse(localStorage.getItem('yl_clean_contact_v1') || '[]'),
+    exportedAt: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const metadata = {
+    name: `清洗訂單_${new Date().toISOString().split('T')[0]}.json`,
+    mimeType: 'application/json'
+  };
+
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  form.append('file', blob);
+
+  fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
+    body: form
+  })
+  .then(res => res.json())
+  .then(res => {
+    if (res.id) alert('✅ 備份成功，上傳至你的 Google Drive！');
+    else alert('❌ 備份失敗：' + JSON.stringify(res));
+  })
+  .catch(err => {
+    console.error(err);
+    alert('❌ 備份發生錯誤');
+  });
+}
+
+document.getElementById('gdriveBackupBtn')?.addEventListener('click', () => {
+  if (!gapiInited) return alert('Google API 尚未初始化，請稍後再試');
+  tokenClient.requestAccessToken();
+});
+
+// 初始化
+window.onload = () => {
+  const script = document.createElement('script');
+  script.src = "https://accounts.google.com/gsi/client";
+  script.onload = () => {
+    gisInited = true;
+    gdriveInit();
+  };
+  document.body.appendChild(script);
+};
+</script></body>
+</html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
 window.addEventListener('DOMContentLoaded', () => {
