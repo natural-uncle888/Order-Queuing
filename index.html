@@ -1450,57 +1450,159 @@ const CLIENT_ID = '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleuser
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 let tokenClient, gapiInited = false, gisInited = false;
 
-function gdriveInit() {
-  gapi.load('client', async () => {
-    await gapi.client.init({ apiKey: '', discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"] });
-    gapiInited = true;
-  });
+// === 將「☁️ Google」按鈕改成：自動備份到固定資料夾「訂單排成備份」===
+// 使用前提：仍沿用既有 GIS Token Client + scope 'https://www.googleapis.com/auth/drive.file'
+// 這段可直接貼到原本 gdrive 相關區塊（覆蓋舊的備份函式與按鈕綁定）。
 
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: async (tokenResponse) => {
-      if (tokenResponse.error) {
-        alert('授權失敗');
-        return;
+// 1) 常數設定
+const BACKUP_FOLDER_NAME = '訂單排成備份';
+
+// 2) 取得 Access Token 的通用方法（沿用你現有的 tokenClient 實例）
+// 說明：你原本已有 tokenClient，這裡提供一個包裝，讓後續呼叫更乾淨。
+async function withAccessToken(run) {
+  return new Promise((resolve, reject) => {
+    try {
+      tokenClient.callback = async (resp) => {
+        try {
+          if (resp.error) throw resp;
+          const result = await run(resp.access_token);
+          resolve(result);
+        } catch (e) {
+          reject(e);
+        }
+      };
+      // 已授權：避免彈窗
+      try {
+        tokenClient.requestAccessToken({ prompt: '' });
+      } catch (_) {
+        // 首次授權：會出現彈窗
+        tokenClient.requestAccessToken();
       }
-      uploadBackupToDrive();
+    } catch (e) {
+      reject(e);
     }
   });
 }
 
-function uploadBackupToDrive() {
-  const data = {
-    orders: JSON.parse(localStorage.getItem('yl_clean_orders_v1') || '[]'),
-    staffList: JSON.parse(localStorage.getItem('yl_clean_staff_v1') || '[]'),
-    contactList: JSON.parse(localStorage.getItem('yl_clean_contact_v1') || '[]'),
-    exportedAt: new Date().toISOString()
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const metadata = {
-    name: `清洗訂單_${new Date().toISOString().split('T')[0]}.json`,
-    mimeType: 'application/json'
-  };
-
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', blob);
-
-  fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-    method: 'POST',
-    headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
-    body: form
-  })
-  .then(res => res.json())
-  .then(res => {
-    if (res.id) alert('✅ 備份成功，上傳至你的 Google Drive！');
-    else alert('❌ 備份失敗：' + JSON.stringify(res));
-  })
-  .catch(err => {
-    console.error(err);
-    alert('❌ 備份發生錯誤');
+// 3) 確認或建立備份資料夾
+async function ensureBackupFolder(accessToken) {
+  // 搜尋同名資料夾（注意：drive.file scope 只能看見由本應用建立/存取過的檔案）
+  const searchParams = new URLSearchParams({
+    q: `mimeType='application/vnd.google-apps.folder' and name='${BACKUP_FOLDER_NAME}' and trashed=false`,
+    fields: 'files(id,name)'
   });
+  const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?${searchParams}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  if (!listRes.ok) throw new Error('查詢資料夾失敗');
+  const listJson = await listRes.json();
+  if (listJson.files && listJson.files.length > 0) {
+    return listJson.files[0].id;
+  }
+  // 建立新資料夾
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json; charset=UTF-8'
+    },
+    body: JSON.stringify({
+      name: BACKUP_FOLDER_NAME,
+      mimeType: 'application/vnd.google-apps.folder'
+    })
+  });
+  if (!createRes.ok) throw new Error('建立資料夾失敗');
+  const createJson = await createRes.json();
+  return createJson.id;
 }
+
+// 4) 將（orders、staffList、contactList…）打包為 JSON 字串（沿用你原本的資料取得方法）
+function buildBackupJson() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    orders: loadOrders(),            // ← 你原本的存取函式
+    staffList: loadStaffList(),      // ← 你原本的存取函式
+    contactList: loadContactList(),  // ← 你原本的存取函式
+    expenses: loadExpenses?.() || [],
+    expenseCategories: loadExpenseCategories?.() || []
+  };
+  return JSON.stringify(payload, null, 2);
+}
+
+// 5) 在指定資料夾內上傳（同日覆寫）
+async function uploadJsonToFolder(accessToken, folderId, fileName, jsonString) {
+  // 檢查同名檔案（在該資料夾）
+  const q = `'${folderId}' in parents and name='${fileName}' and trashed=false`;
+  const search = new URLSearchParams({ q, fields: 'files(id,name)' });
+  const existRes = await fetch(`https://www.googleapis.com/drive/v3/files?${search}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  if (!existRes.ok) throw new Error('查詢既有備份失敗');
+  const existJson = await existRes.json();
+  const existing = (existJson.files && existJson.files[0]) || null;
+
+  const metadata = {
+    name: fileName,
+    mimeType: 'application/json',
+    parents: [folderId]
+  };
+  const boundary = '-------yl_backup_' + Math.random().toString(16).slice(2);
+  const body = [
+    `--${boundary}`,
+    'Content-Type: application/json; charset=UTF-8',
+    '',
+    JSON.stringify(metadata),
+    `--${boundary}`,
+    'Content-Type: application/json; charset=UTF-8',
+    '',
+    jsonString,
+    `--${boundary}--`,
+    ''
+  ].join('\r\n');
+
+  const method = existing ? 'PATCH' : 'POST';
+  const url = existing
+    ? `https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=multipart&fields=id`
+    : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id`;
+
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': `multipart/related; boundary=${boundary}`
+    },
+    body
+  });
+  if (!res.ok) throw new Error('上傳備份失敗');
+}
+
+// 6) 主要入口：一鍵自動備份到固定資料夾
+async function gdriveAutoBackupToFixedFolder() {
+  const fileName = `清洗訂單_${new Date().toISOString().slice(0,10)}.json`;
+  const json = buildBackupJson();
+  await withAccessToken(async (accessToken) => {
+    const folderId = await ensureBackupFolder(accessToken);
+    await uploadJsonToFolder(accessToken, folderId, fileName, json);
+  });
+  alert(`已備份到「${BACKUP_FOLDER_NAME}」資料夾（檔名：${fileName}）`);
+}
+
+// 7) 事件綁定：將右上角「☁️Google」按鈕改綁到新函式
+(function bindGoogleBackupButton() {
+  const btn = document.querySelector('#btn-gdrive-backup'); // ← 你的按鈕 id（若不同請調整）
+  if (!btn) return;
+  btn.onclick = () => {
+    gdriveAutoBackupToFixedFolder().catch(err => {
+      console.error(err);
+      alert('Google Drive 備份發生問題：' + (err && err.message ? err.message : err));
+    });
+  };
+})();
+
+// 備註：
+// 1) 這版使用 drive.file scope。若想「使用既有（非本程式建立）的同名資料夾」，需擴權至 drive.metadata.readonly 或 drive（較寬），
+//    或在首次使用時呼叫 Drive Picker 讓使用者選擇一次資料夾以授權可見。此處遵循最小權限，會自建並沿用自己的資料夾。
+// 2) 檔名採日期，同日再次備份會覆寫同名檔，避免累積太多分身。
 
 document.getElementById('gdriveBackupBtn')?.addEventListener('click', () => {
   if (!gapiInited) return alert('Google API 尚未初始化，請稍後再試');
@@ -1517,169 +1619,7 @@ window.onload = () => {
   };
   document.body.appendChild(script);
 };
-</script>
-<!-- === Auto-backup to 「訂單排成備份」資料夾：附加覆蓋版 === -->
-<script>
-// 若你的頁面已載入 GSI 與建立 tokenClient（沿用現有變數 tokenClient 與初始化流程）
-// 這段腳本會覆蓋舊的雲端備份按鈕行為，將檔案自動備份到固定資料夾「訂單排成備份」，同日重按會覆寫同名檔。
-
-(function(){
-  const BACKUP_FOLDER_NAME = '訂單排成備份';
-
-  async function withAccessToken(run) {
-    return new Promise((resolve, reject) => {
-      try {
-        if (!window.tokenClient) throw new Error('tokenClient 尚未初始化');
-        tokenClient.callback = async (resp) => {
-          try {
-            if (resp.error) throw resp;
-            const result = await run(resp.access_token);
-            resolve(result);
-          } catch (e) { reject(e); }
-        };
-        try {
-          tokenClient.requestAccessToken({ prompt: '' });
-        } catch (_) {
-          tokenClient.requestAccessToken();
-        }
-      } catch (e) { reject(e); }
-    });
-  }
-
-  async function ensureBackupFolder(accessToken) {
-    const searchParams = new URLSearchParams({
-      q: `mimeType='application/vnd.google-apps.folder' and name='${BACKUP_FOLDER_NAME}' and trashed=false`,
-      fields: 'files(id,name)'
-    });
-    const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?${searchParams}`, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (!listRes.ok) throw new Error('查詢資料夾失敗');
-    const listJson = await listRes.json();
-    if (listJson.files && listJson.files.length > 0) return listJson.files[0].id;
-
-    const createRes = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json; charset=UTF-8'
-      },
-      body: JSON.stringify({
-        name: BACKUP_FOLDER_NAME,
-        mimeType: 'application/vnd.google-apps.folder'
-      })
-    });
-    if (!createRes.ok) throw new Error('建立資料夾失敗');
-    const createJson = await createRes.json();
-    return createJson.id;
-  }
-
-  function buildBackupJson() {
-    // 盡量沿用既有的資料讀取函式名稱，若不存在則以空陣列代替，避免報錯
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      orders: (window.loadOrders ? loadOrders() : []),
-      staffList: (window.loadStaffList ? loadStaffList() : []),
-      contactList: (window.loadContactList ? loadContactList() : []),
-      expenses: (window.loadExpenses ? loadExpenses() : []),
-      expenseCategories: (window.loadExpenseCategories ? loadExpenseCategories() : [])
-    };
-    return JSON.stringify(payload, null, 2);
-  }
-
-  async function uploadJsonToFolder(accessToken, folderId, fileName, jsonString) {
-    const q = `'${folderId}' in parents and name='${fileName}' and trashed=false`;
-    const search = new URLSearchParams({ q, fields: 'files(id,name)' });
-    const existRes = await fetch(`https://www.googleapis.com/drive/v3/files?${search}`, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (!existRes.ok) throw new Error('查詢既有備份失敗');
-    const existJson = await existRes.json();
-    const existing = (existJson.files && existJson.files[0]) || null;
-
-    const metadata = {
-      name: fileName,
-      mimeType: 'application/json',
-      parents: [folderId]
-    };
-    const boundary = '-------yl_backup_' + Math.random().toString(16).slice(2);
-    const body = [
-      `--${boundary}`,
-      'Content-Type: application/json; charset=UTF-8',
-      '',
-      JSON.stringify(metadata),
-      `--${boundary}`,
-      'Content-Type: application/json; charset=UTF-8',
-      '',
-      jsonString,
-      `--${boundary}--`,
-      ''
-    ].join('\r\n');
-
-    const method = existing ? 'PATCH' : 'POST';
-    const url = existing
-      ? `https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=multipart&fields=id`
-      : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id`;
-
-    const res = await fetch(url, {
-      method,
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': `multipart/related; boundary=${boundary}`
-      },
-      body
-    });
-    if (!res.ok) throw new Error('上傳備份失敗');
-  }
-
-  async function gdriveAutoBackupToFixedFolder() {
-    const fileName = `清洗訂單_${new Date().toISOString().slice(0,10)}.json`;
-    const json = buildBackupJson();
-    await withAccessToken(async (accessToken) => {
-      const folderId = await ensureBackupFolder(accessToken);
-      await uploadJsonToFolder(accessToken, folderId, fileName, json);
-    });
-    alert(`已備份到「${BACKUP_FOLDER_NAME}」資料夾（檔名：${fileName}）`);
-  }
-
-  function tryBindButtons() {
-    const candidates = [
-      '#btn-gdrive-backup','#btn-gdrive','#btn-google','#btnBackupGoogle',
-      '#btn-cloud','#btnDrive','#btnBackup','#gdrive-backup'
-    ];
-    let btn = null;
-    for (const sel of candidates) {
-      const el = document.querySelector(sel);
-      if (el) { btn = el; break; }
-    }
-    // 退而求其次：找包含 Google/雲端/☁️ 字樣的按鈕
-    if (!btn) {
-      const allBtns = Array.from(document.querySelectorAll('button, a, [role=\"button\"]'));
-      btn = allBtns.find(el => /google|雲端|備份|☁️/i.test(el.textContent || ''));
-    }
-    if (btn) {
-      btn.addEventListener('click', function(ev){
-        ev.preventDefault();
-        gdriveAutoBackupToFixedFolder().catch(err => {
-          console.error(err);
-          alert('Google Drive 備份發生問題：' + (err && err.message ? err.message : err));
-        });
-      }, true);
-    } else {
-      console.warn('找不到 Google 備份按鈕，請確認按鈕的 selector 並綁定至 gdriveAutoBackupToFixedFolder');
-    }
-  }
-
-  // 避免和現有初始化時序衝突，DOM 互動延後到 load 後
-  if (document.readyState === 'complete') {
-    setTimeout(tryBindButtons, 0);
-  } else {
-    window.addEventListener('load', () => setTimeout(tryBindButtons, 0));
-  }
-})();
-</script>
-
-</body>
+</script></body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
