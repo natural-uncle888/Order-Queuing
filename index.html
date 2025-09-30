@@ -100,7 +100,7 @@
     details.accordion[open] > summary{border-bottom:1px solid var(--border)}
     details.accordion .content{padding:16px}
   </style>
-</head>
+<script onload="handleClientLoad()" src="https://apis.google.com/js/api.js"></script><script onload="handleClientLoad()" src="https://apis.google.com/js/api.js"></script></head>
 <body>
 <header>
 <div class="wrap toolbar">
@@ -138,7 +138,7 @@
 <strong>搜尋</strong>
 <input id="searchInput" placeholder="姓名 / 電話 / 地址" style="width:220px" type="text"/>
 </div>
-<div class="right"><button class="accent" id="gdriveBackupBtn">☁️Google</button>
+<div class="right"><button class="accent" id="backup_button">☁️Google</button>
 <button class="accent" id="newBtn">新增訂單</button>
 <button id="newExpenseBtn">新增花費</button>
 <button id="exportJson">匯出JSON</button>
@@ -1526,7 +1526,112 @@ window.addEventListener('DOMContentLoaded', () => {
             alert("❌ 備份發生錯誤：" + e.message);
         }
     });
-}</script></body>
+}</script>
+<script>
+  const CLIENT_ID = "894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com";
+  const SCOPES = "https://www.googleapis.com/auth/drive.file";
+
+  const authorizeButton = document.getElementById("authorize_button");
+  const backupButton = document.getElementById("backup_button");
+
+  function handleClientLoad() {
+    console.log("📦 GAPI 載入中...");
+    gapi.load("client:auth2", initClient);
+  }
+
+  function initClient() {
+    gapi.client.init({
+      clientId: CLIENT_ID,
+      scope: SCOPES,
+    }).then(function () {
+      console.log("✅ Google API 初始化完成");
+
+      // 綁定登入按鈕事件
+      document.getElementById("authorize_button").onclick = function () {
+        gapi.auth2.getAuthInstance().signIn().then(function () {
+          console.log("🔐 已登入 Google 帳號");
+          document.getElementById("backup_button").disabled = false;
+        });
+      };
+
+      // 若已登入則啟用備份
+      if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
+        document.getElementById("backup_button").disabled = false;
+      } else {
+        document.getElementById("backup_button").disabled = true;
+      }
+    }, function(error) {
+      console.error("❌ 初始化失敗：", error);
+      alert("Google API 初始化失敗，請檢查 client_id 設定與網路連線");
+    });
+  }
+
+  window.onload = function () {
+    document.getElementById("backup_button").disabled = true;
+  };
+</script>
+
+<script>
+const CLIENT_ID = "894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com";
+const SCOPES = "https://www.googleapis.com/auth/drive.file";
+
+let gapiInitialized = false;
+let driveReady = false;
+
+// 自動載入並初始化 gapi
+function handleClientLoad() {
+  gapi.load("client:auth2", initClient);
+}
+
+function initClient() {
+  gapi.client.init({
+    clientId: CLIENT_ID,
+    scope: SCOPES,
+  }).then(function () {
+    gapiInitialized = true;
+    console.log("✅ Google API 初始化完成");
+
+    // 若已登入則啟用備份按鈕
+    if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
+      driveReady = true;
+      document.getElementById("backup_button").disabled = false;
+    }
+  }, function(error) {
+    console.error("❌ Google API 初始化失敗", error);
+    alert("Google API 初始化失敗，請檢查 client_id 或網路連線。");
+  });
+}
+
+// 修改備份按鈕行為：自動登入 + 備份
+document.addEventListener("DOMContentLoaded", function () {
+  const btn = document.getElementById("backup_button");
+  if (btn) {
+    btn.addEventListener("click", async function () {
+      if (!gapiInitialized) {
+        alert("Google API 尚未初始化，請稍後再試");
+        return;
+      }
+
+      if (!gapi.auth2.getAuthInstance().isSignedIn.get()) {
+        try {
+          await gapi.auth2.getAuthInstance().signIn();
+          driveReady = true;
+          console.log("🔐 已成功登入 Google 帳戶");
+        } catch (e) {
+          alert("❌ Google 登入失敗：" + e.error);
+          return;
+        }
+      }
+
+      // 登入後才執行備份
+      if (driveReady) {
+        uploadBackupToDrive();
+      }
+    });
+  }
+});
+</script>
+</body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
