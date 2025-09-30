@@ -1517,7 +1517,178 @@ window.onload = () => {
   };
   document.body.appendChild(script);
 };
-</script></body>
+</script>
+<!-- === Auto-backup to 「訂單排成備份」資料夾：附加覆蓋版 === -->
+<script>
+// 若你的頁面已載入 GSI 與建立 tokenClient（沿用現有變數 tokenClient 與初始化流程）
+// 這段腳本會覆蓋舊的雲端備份按鈕行為，將檔案自動備份到固定資料夾「訂單排成備份」，同日重按會覆寫同名檔。
+
+(function(){
+  const BACKUP_FOLDER_NAME = '訂單排成備份';
+
+  async function withAccessToken(run) {
+    return new Promise((resolve, reject) => {
+      try {
+        if (!window.tokenClient) throw new Error('tokenClient 尚未初始化');
+        tokenClient.callback = async (resp) => {
+          try {
+            if (resp.error) throw resp;
+            const result = await run(resp.access_token);
+            resolve(result);
+          } catch (e) { reject(e); }
+        };
+        try {
+          tokenClient.requestAccessToken({ prompt: '' });
+        } catch (_) {
+          tokenClient.requestAccessToken();
+        }
+      } catch (e) { reject(e); }
+    });
+  }
+
+  async function ensureBackupFolder(accessToken) {
+    const searchParams = new URLSearchParams({
+      q: `mimeType='application/vnd.google-apps.folder' and name='${BACKUP_FOLDER_NAME}' and trashed=false`,
+      fields: 'files(id,name)'
+    });
+    const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?${searchParams}`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!listRes.ok) throw new Error('查詢資料夾失敗');
+    const listJson = await listRes.json();
+    if (listJson.files && listJson.files.length > 0) return listJson.files[0].id;
+
+    const createRes = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json; charset=UTF-8'
+      },
+      body: JSON.stringify({
+        name: BACKUP_FOLDER_NAME,
+        mimeType: 'application/vnd.google-apps.folder'
+      })
+    });
+    if (!createRes.ok) throw new Error('建立資料夾失敗');
+    const createJson = await createRes.json();
+    return createJson.id;
+  }
+
+  function buildBackupJson() {
+    // 盡量沿用既有的資料讀取函式名稱，若不存在則以空陣列代替，避免報錯
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      orders: (window.loadOrders ? loadOrders() : []),
+      staffList: (window.loadStaffList ? loadStaffList() : []),
+      contactList: (window.loadContactList ? loadContactList() : []),
+      expenses: (window.loadExpenses ? loadExpenses() : []),
+      expenseCategories: (window.loadExpenseCategories ? loadExpenseCategories() : [])
+    };
+    return JSON.stringify(payload, null, 2);
+  }
+
+  async function uploadJsonToFolder(accessToken, folderId, fileName, jsonString) {
+    const q = `'${folderId}' in parents and name='${fileName}' and trashed=false`;
+    const search = new URLSearchParams({ q, fields: 'files(id,name)' });
+    const existRes = await fetch(`https://www.googleapis.com/drive/v3/files?${search}`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!existRes.ok) throw new Error('查詢既有備份失敗');
+    const existJson = await existRes.json();
+    const existing = (existJson.files && existJson.files[0]) || null;
+
+    const metadata = {
+      name: fileName,
+      mimeType: 'application/json',
+      parents: [folderId]
+    };
+    const boundary = '-------yl_backup_' + Math.random().toString(16).slice(2);
+    const body = [
+      `--${boundary}`,
+      'Content-Type: application/json; charset=UTF-8',
+      '',
+      JSON.stringify(metadata),
+      `--${boundary}`,
+      'Content-Type: application/json; charset=UTF-8',
+      '',
+      jsonString,
+      `--${boundary}--`,
+      ''
+    ].join('\r\n');
+
+    const method = existing ? 'PATCH' : 'POST';
+    const url = existing
+      ? `https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=multipart&fields=id`
+      : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id`;
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`
+      },
+      body
+    });
+    if (!res.ok) throw new Error('上傳備份失敗');
+  }
+  function localISODate(){
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+
+
+  async function gdriveAutoBackupToFixedFolder() {
+    const fileName = `清洗訂單_最新.json`;
+    const json = buildBackupJson();
+    await withAccessToken(async (accessToken) => {
+      const folderId = await ensureBackupFolder(accessToken);
+      await uploadJsonToFolder(accessToken, folderId, fileName, json);
+    });
+    alert(`已備份到「${BACKUP_FOLDER_NAME}」資料夾，並覆蓋同名檔（${fileName}）`);
+  }
+
+  function tryBindButtons() {
+    const candidates = [
+      '#btn-gdrive-backup','#btn-gdrive','#btn-google','#btnBackupGoogle',
+      '#btn-cloud','#btnDrive','#btnBackup','#gdrive-backup'
+    ];
+    let btn = null;
+    for (const sel of candidates) {
+      const el = document.querySelector(sel);
+      if (el) { btn = el; break; }
+    }
+    // 退而求其次：找包含 Google/雲端/☁️ 字樣的按鈕
+    if (!btn) {
+      const allBtns = Array.from(document.querySelectorAll('button, a, [role=\"button\"]'));
+      btn = allBtns.find(el => /google|雲端|備份|☁️/i.test(el.textContent || ''));
+    }
+    if (btn) {
+      btn.addEventListener('click', function(ev){
+        ev.preventDefault();
+        gdriveAutoBackupToFixedFolder().catch(err => {
+          console.error(err);
+          alert('Google Drive 備份發生問題：' + (err && err.message ? err.message : err));
+        });
+      }, true);
+    } else {
+      console.warn('找不到 Google 備份按鈕，請確認按鈕的 selector 並綁定至 gdriveAutoBackupToFixedFolder');
+    }
+  }
+
+  // 避免和現有初始化時序衝突，DOM 互動延後到 load 後
+  if (document.readyState === 'complete') {
+    setTimeout(tryBindButtons, 0);
+  } else {
+    window.addEventListener('load', () => setTimeout(tryBindButtons, 0));
+  }
+})();
+</script>
+
+</body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
