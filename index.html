@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>清洗訂單排程系統</title>
+<link rel="icon" type="image/png" href="https://res.cloudinary.com/dijzndzw2/image/upload/v1757176751/logo-3_hddq08.png"/>
+<style>
+    :root{
+      --bg:#f7f7fb;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --text:#111827;
+      --primary:#2563eb;
+      --primary-weak:#dbeafe;
+      --accent:#10b981;
+      --warn:#f59e0b;
+      --danger:#ef4444;
+      --border:#e5e7eb;
+      --radius:16px;
+      --shadow:0 10px 25px rgba(0,0,0,.08);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:system-ui, -apple-system, "Noto Sans TC", Segoe UI, Roboto, Helvetica, Arial;
+      background:linear-gradient(180deg,var(--bg),#eef2ff);
+      color:var(--text);
+    }
+    header{
+      position:sticky;top:0;z-index:10;
+      background:rgba(255,255,255,.8);backdrop-filter:saturate(1.2) blur(8px);
+      border-bottom:1px solid var(--border);
+    }
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    .stack{display:flex;flex-direction:column;gap:16px}
+    .card{
+      background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);
+    }
+    .card h2{margin:0;padding:14px 16px;border-bottom:1px solid var(--border);font-size:18px}
+    .card .body{padding:16px}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;margin-bottom:12px}
+    @media (max-width:900px){.row{grid-template-columns:repeat(6,1fr)}}
+    label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+    input,select,textarea,button{font:inherit}
+    input[type="text"],input[type="date"],input[type="time"],input[type="number"],select,textarea{
+      width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;outline:none;
+    }
+    textarea{min-height:72px;resize:vertical}
+    .muted{color:var(--muted)}
+    .pill{
+      border-radius:999px;padding:8px 12px;border:1px solid var(--border);background:#fff;display:inline-flex;gap:8px;align-items:center
+    }
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px}
+    .toolbar button, .toolbar .right button{
+      padding:10px 14px;border-radius:999px;border:1px solid var(--border);
+      background:#fff;color:var(--text);cursor:pointer
+    }
+    .toolbar .primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .toolbar .accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .toolbar .warn{background:var(--warn);color:#111}
+    .toolbar .danger{background:var(--danger);color:#fff}
+    .toolbar .right{margin-left:auto;display:flex;gap:8px}
+    table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border-radius:12px;border:1px solid var(--border)}
+    thead th{background:#f3f4f6;color:#374151;font-weight:600;text-align:left;font-size:12px;padding:10px;border-bottom:1px solid var(--border)}
+    tbody td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+    tbody tr:hover{background:#fafafa}
+    .status{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid;cursor:pointer;user-select:none}
+    .status.P排定{color:#2563eb;border-color:#93c5fd;background:#eff6ff}
+    .status.C完成{color:#10b981;border-color:#a7f3d0;background:#ecfdf5}
+    .status.N未完成{color:#ef4444;border-color:#fecaca;background:#fef2f2}
+    .sum{display:flex;gap:12px;flex-wrap:wrap}
+    .sum .box{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 14px;min-width:170px;box-shadow:var(--shadow)}
+    .number{font-size:18px;font-weight:700}
+    .small{font-size:12px}
+    .hr{height:1px;background:var(--border);margin:8px 0 16px}
+    .inline-btn{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#fff;color:var(--text);cursor:pointer;margin-left:8px}
+    .right-align{text-align:right}
+    .editable{cursor:pointer}
+    .editable:hover{background:#f9fafb}
+    .checkpill{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#fff;cursor:pointer;user-select:none}
+    .checkpill.on{background:#ecfdf5;border-color:#a7f3d0;color:#059669}
+    .checkpill.off{background:#f9fafb;color:#6b7280}
+    .icon-btn{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#fff;cursor:pointer}
+    .icon-btn.danger{background:#fee2e2;border-color:#fecaca;color:#b91c1c}
+    .hidden{display:none !important}
+    .checkbox-group{display:flex;gap:8px;flex-wrap:wrap}
+    .checkbox{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);padding:6px 10px;border-radius:999px;background:#fff}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media (max-width:900px){.two-col{grid-template-columns:1fr}}
+    mark{background:#fde68a;padding:0 .15em;border-radius:3px}
+    .badge-soft{display:inline-block;padding:2px 8px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:12px}
+    .lock-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#6b7280}
+    .tiny{font-size:11px;color:#6b7280}
+    /* Accordion */
+    details.accordion{border:1px solid var(--border);border-radius:var(--radius);background:var(--card);box-shadow:var(--shadow)}
+    details.accordion > summary{list-style:none;cursor:pointer;padding:14px 16px;border-radius:var(--radius);font-weight:600}
+    details.accordion[open] > summary{border-bottom:1px solid var(--border)}
+    details.accordion .content{padding:16px}
+  </style>
+</head>
+<body>
+<header>
+<div class="wrap toolbar">
+<div class="pill">
+<strong>月份</strong>
+<select id="yearSel"></select>
+<select id="monthSel"></select>
+</div>
+<div class="pill">
+<strong>作業人員</strong>
+<select id="staffFilter"></select>
+</div>
+<div class="pill">
+<strong>狀況</strong>
+<select id="statusFilter">
+<option value="">全部</option>
+<option value="排定">排定</option>
+<option value="完成">完成</option>
+<option value="未完成">未完成</option>
+</select>
+</div>
+<div class="pill">
+<strong>完成時間</strong>
+<select id="completedRange">
+<option value="">全部</option>
+<option value="7">近7天</option>
+<option value="30">近30天</option>
+</select>
+</div>
+<label class="pill" style="gap:8px">
+<input checked="" id="showUndated" type="checkbox"/>
+<span>顯示未排期</span>
+</label>
+<div class="pill">
+<strong>搜尋</strong>
+<input id="searchInput" placeholder="姓名 / 電話 / 地址" style="width:220px" type="text"/>
+</div>
+<div class="right">
+<button class="accent" id="newBtn">新增訂單</button>
+        <button id="newExpenseBtn">新增花費</button>
+<button id="exportJson">匯出JSON</button>
+<button id="exportXlsx">匯出Excel</button>
+<button class="warn" id="importJson">匯入JSON</button>
+<button class="danger" id="clearAll">清空資料</button>
+</div>
+</div>
+</header>
+
+<main class="wrap stack" style="margin-top:16px">
+<!-- 訂單列表（上） -->
+<section class="card">
+<h2>訂單列表</h2>
+<div class="body">
+<div class="sum" id="summary"></div>
+<div class="hr"></div>
+<div class="small muted">小技巧：
+        1) 點「狀況」籤可快速切換（排定 → 完成 → 未完成）。
+        2) 直接點「日期」或「時間」欄可快速編輯；Enter/失焦儲存，Esc 取消。 3) 右上可用關鍵字搜尋（姓名/電話/地址），結果會自動高亮。
+        未填日期會標記 <span class="badge-soft">未排期</span>、未填時間會標記 <span class="badge-soft">未排定</span>。</div>
+<div style="overflow:auto;margin-top:8px">
+<table id="ordersTable">
+<thead>
+<tr>
+<th>#</th>
+<th>日期</th>
+<th>時間</th>
+<th>作業人員</th>
+<th>客戶</th>
+<th>電話</th>
+<th>時段</th>
+<th>地址</th>
+<th>狀況</th>
+<th>確認</th>
+<th>報價單</th>
+<th class="right-align">總金額</th>
+<th class="right-align">折後</th>
+<th>來源</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
+</section>
+<!-- 訂單表單（中） -->
+<details class="accordion" id="orderAccordion" ="True"><summary><span id="formTitle">新增 / 編輯訂單</span></summary><div class="content">
+<form id="orderForm">
+<input id="id" type="hidden"/>
+<div class="row">
+<div class="col" style="grid-column:span 6">
+<label>作業人員</label>
+<div class="toolbar" style="gap:8px">
+<select id="staff"></select>
+<button class="inline-btn" id="addStaffBtn" type="button">新增人員</button>
+</div>
+</div>
+<div class="col" style="grid-column:span 3">
+<label>日期（可留空，之後再填）</label>
+<input id="date" type="date"/>
+</div>
+<div class="col" style="grid-column:span 3">
+<label>時間</label>
+<input id="time" type="time"/>
+</div>
+</div>
+<div class="row">
+<div class="col" style="grid-column:span 6">
+<label>姓名（支援通訊錄）</label>
+<input id="customer" list="contactsDL" placeholder="客戶姓名" type="text"/>
+<datalist id="contactsDL"></datalist>
+<div class="tiny">選既有客戶會自動帶出電話/地址</div>
+</div>
+<div class="col" style="grid-column:span 3">
+<label>LINE or Fackbook ID</label>
+<input id="lineId" type="text"/>
+</div>
+<div class="col" style="grid-column:span 3">
+<label>電話</label>
+<input id="phone" placeholder="0912-345-678（可含 - ）" type="text"/>
+</div>
+</div>
+<div class="row">
+<div class="col" style="grid-column:span 5">
+<label>安排時段（可複選）</label>
+<div class="checkbox-group" id="slotGroup"></div>
+<input class="hidden tiny" id="slotNote" placeholder="請輸入指定日期／時段（如 10/10 上午 或 10/12 9:00–12:00）" type="text"/>
+</div>
+<div class="col" style="grid-column:span 7">
+<label>清洗地址</label>
+<input id="address" placeholder="地址" type="text"/>
+</div>
+</div>
+<div class="row">
+<div class="col" style="grid-column:span 6">
+<label>居住地型態</label>
+<div class="toolbar" style="gap:8px">
+<select id="residenceType">
+<option value="">（未選擇）</option>
+<option value="透天屋">透天屋</option>
+<option value="大樓(有電梯)">大樓(有電梯)</option>
+<option value="大樓(無電梯)">大樓(無電梯)</option>
+<option value="其他">其他（可自行輸入）</option>
+</select>
+<input class="hidden" id="residenceOther" placeholder="請輸入其他型態" type="text"/>
+</div>
+</div>
+<div class="col" style="grid-column:span 6">
+<label>方便聯繫時間（可複選）</label>
+<div class="checkbox-group" id="contactTimesGroup"></div>
+<input class="hidden tiny" id="contactTimeNote" placeholder="請輸入指定時間（如 9:00–12:00 或 週三晚上）" type="text"/>
+</div>
+</div>
+<div class="row">
+<div class="col" style="grid-column:span 6">
+<label>冷氣位於樓層（可複選）</label>
+<div class="checkbox-group" id="acFloors"></div>
+</div>
+<div class="col" style="grid-column:span 6">
+<label>洗衣機位於樓層（可複選）</label>
+<div class="checkbox-group" id="washerFloors"></div>
+</div>
+</div>
+<div class="row">
+<div class="col" style="grid-column:span 8">
+<label>與我司聯繫方式</label>
+<div class="toolbar" style="gap:8px">
+<select id="contactMethod"></select>
+<button class="inline-btn" id="addContactMethod" type="button">新增聯繫方式</button>
+</div>
+</div>
+<div class="col" style="grid-column:span 4">
+<label>狀況</label>
+<select id="status">
+<option value="排定">排定</option>
+<option value="完成">完成</option>
+<option value="未完成">未完成</option>
+</select>
+</div>
+</div>
+<div class="hr"></div>
+<h3 style="margin:0 0 8px">清洗項目與價格</h3>
+<div class="row">
+<div class="col" style="grid-column:span 6">
+<label>分離式冷氣室內機（每台1800；滿3台每台1500）</label>
+<input id="acSplit" min="0" step="1" type="number" value="0"/>
+</div>
+<div class="col" style="grid-column:span 6">
+<label>吊隱式冷氣（每台2800）</label>
+<input id="acDuct" min="0" step="1" type="number" value="0"/>
+</div>
+</div>
+<div class="row">
+<div class="col" style="grid-column:span 6">
+<label>直立式洗衣機（每台2000；若同單含冷氣室內機則每台1800）</label>
+<input id="washerTop" min="0" step="1" type="number" value="0"/>
+</div>
+<div class="col" style="grid-column:span 6">
+<label>水塔（每顆1000）</label>
+<input id="waterTank" min="0" step="1" type="number" value="0"/>
+</div>
+</div>
+<div class="row">
+<div class="col" style="grid-column:span 6">
+<label>自來水管（自訂金額，未稅總額）</label>
+<input id="pipesAmount" min="0" step="1" type="number" value="0"/>
+</div>
+<div class="col" style="grid-column:span 6">
+<label>防霉噴劑（每台300；滿5台每台250）</label>
+<input id="antiMold" min="0" step="1" type="number" value="0"/>
+</div>
+</div>
+<div class="row">
+<div class="col" style="grid-column:span 6">
+<label>臭氧殺菌（每間200）</label>
+<input id="ozone" min="0" step="1" type="number" value="0"/>
+</div>
+<div class="col" style="grid-column:span 6">
+<label>變形金剛機型（每台加500）</label>
+<input id="transformerCount" min="0" step="1" type="number" value="0"/>
+</div>
+</div>
+<div class="row">
+<div class="col" style="grid-column:span 6">
+<label>分離式室內機長度 &gt; 182cm（每台加300）</label>
+<input id="longSplitCount" min="0" step="1" type="number" value="0"/>
+</div>
+<div class="col" style="grid-column:span 6">
+<label>一體式水盤（每台加500）</label>
+<input id="onePieceTray" min="0" step="1" type="number" value="0"/>
+</div>
+</div>
+<div class="row">
+<div class="col" style="grid-column:span 12">
+<label>備註</label>
+<textarea id="note" placeholder="其他補充事項"></textarea>
+</div>
+</div>
+<div class="hr"></div>
+<div class="row">
+<div class="col" style="grid-column:span 4">
+<label><input id="confirmed" type="checkbox"/> 客人確認安排時間</label>
+</div>
+<div class="col" style="grid-column:span 4">
+<label><input id="quotationOk" type="checkbox"/> 客人確認報價單</label>
+</div>
+<div class="col right-align" style="grid-column:span 4">
+<button class="inline-btn" id="recalc" type="button">重新計算金額</button>
+</div>
+</div>
+<div class="row">
+<div class="col" style="grid-column:span 4">
+<label>總金額（自動）</label>
+<input id="total" readonly="" type="number"/>
+</div>
+<div class="col" style="grid-column:span 4">
+<label>折扣金額（可輸入）</label>
+<input id="discount" min="0" step="1" type="number" value="0"/>
+</div>
+<div class="col" style="grid-column:span 4">
+<label>折後總金額（自動）</label>
+<input id="netTotal" readonly="" type="number"/>
+</div>
+</div>
+<div class="hr"></div>
+<div class="toolbar">
+<button class="primary" id="saveBtn" type="submit">儲存訂單</button>
+<button id="resetBtn" type="button">清空表單</button>
+<button id="copyLastBtn" type="button">複製上一筆</button>
+<button id="copyFromHistoryBtn" type="button">從客戶舊單帶入</button>
+<div class="right">
+<span class="lock-badge" id="lockInfo"></span>
+<button class="warn" id="toggleLock" type="button">解鎖金額編輯</button>
+<button class="danger" disabled="" id="deleteBtn" type="button">刪除此訂單</button>
+</div>
+</div>
+</form>
+</div></details>
+<!-- 支出模組（下）以手風琴呈現 -->
+<details class="accordion" id="expenseAcc" ="">
+<summary>本月花費（可展開/收合）</summary>
+<div class="content">
+<div class="two-col">
+<section class="card" style="border:none;box-shadow:none">
+<h2>本月花費列表</h2>
+<div class="body">
+<div class="toolbar" style="margin-bottom:8px">
+<button id="expExportCsv">匯出花費CSV</button>
+<button id="expExportJson">匯出花費JSON</button>
+<button class="warn" id="expImportJson">匯入花費JSON</button>
+<button class="danger" id="expClear">清空花費</button>
+</div>
+<div style="overflow:auto">
+<table id="expenseTable">
+<thead>
+<tr>
+<th>#</th>
+<th>日期</th>
+<th>類別</th>
+<th>說明</th>
+<th class="right-align">金額</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
+</section>
+<aside class="card" style="border:none;box-shadow:none">
+<h2>新增 / 編輯花費</h2>
+<div class="body">
+<form id="expenseForm">
+<input id="expId" type="hidden"/>
+<div class="row">
+<div class="col" style="grid-column:span 4">
+<label>日期</label>
+<input id="expDate" type="date"/>
+</div>
+<div class="col" style="grid-column:span 4">
+<label>類別</label>
+<div class="toolbar" style="gap:8px">
+<select id="expCategory"></select>
+<button class="inline-btn" id="addExpCat" type="button">新增類別</button>
+</div>
+</div>
+<div class="col" style="grid-column:span 4">
+<label>金額</label>
+<input id="expAmount" min="0" step="1" type="number" value="0"/>
+</div>
+</div>
+<div class="row">
+<div class="col" style="grid-column:span 12">
+<label>說明</label>
+<input id="expNote" placeholder="例如：材料、加油、停車、工具維修…" type="text"/>
+</div>
+</div>
+<div class="toolbar">
+<button class="primary" id="expSave" type="submit">儲存花費</button>
+<button id="expReset" type="button">清空表單</button>
+<div class="right">
+<button class="danger" disabled="" id="expDelete" type="button">刪除此筆花費</button>
+</div>
+</div>
+</form>
+</div>
+</aside>
+</div>
+</div>
+</details>
+</main>
+<input accept=".json" class="hidden" id="filePicker" type="file"/>
+<input accept=".json" class="hidden" id="filePickerExp" type="file"/>
+<template id="expRowTpl">
+<tr>
+<td class="small muted"></td>
+<td></td><td></td><td></td><td class="right-align"></td>
+</tr>
+</template>
+<script>
+    // ---------- Utilities ----------
+    const $ = (id) => document.getElementById(id);
+    const fmtCurrency = n => Number(n||0).toLocaleString('zh-TW', {style:'currency', currency:'TWD', maximumFractionDigits:0});
+    const today = new Date();
+    const pad2 = n => n.toString().padStart(2,'0');
+    const SLOT_OPTS = ['平日','假日','上午','下午','皆可','日期指定'];
+    const CONTACT_TIME_OPTS = ['平日','假日','上午','下午','晚上','皆可','時間指定'];
+    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','有電梯'];
+    const STATUS_FLOW = ['排定','完成','未完成'];
+
+    function renderChecks(containerId, options, name){
+      const el = $(containerId);
+      el.innerHTML = options.map(opt => `<label class="checkbox"><input type="checkbox" data-name="${name}" value="${opt}"><span>${opt}</span></label>`).join('');
+    }
+    function getChecked(name){ return Array.from(document.querySelectorAll('input[type="checkbox"][data-name="'+name+'"]:checked')).map(x=>x.value); }
+    function setChecked(name, values){ const set = new Set(values||[]); document.querySelectorAll('input[type="checkbox"][data-name="'+name+'"]').forEach(x=> x.checked = set.has(x.value)); }
+
+    // ---------- Storage ----------
+    const KEY = 'yl_clean_orders_v1';
+    const STAFF_KEY = 'yl_clean_staff_v1';
+    const CONTACT_KEY = 'yl_clean_contact_v1';
+    const EXP_KEY = 'yl_clean_expenses_v1';
+    const EXP_CAT_KEY = 'yl_clean_expense_categories_v1';
+    const load = (k, fallback) => { try{ return JSON.parse(localStorage.getItem(k) || 'null') ?? fallback; }catch{ return fallback; } }
+    const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+    let orders = load(KEY, []);
+    let staffList = load(STAFF_KEY, ['自然大叔']);
+    let contactList = load(CONTACT_KEY, ['Line','Facebook粉絲團','直接線上預約','直接來電','裕良電器行','其他']);
+    let expenses = load(EXP_KEY, []);
+    let expCats = load(EXP_CAT_KEY, ['材料','加油','停車','工具/維修','其他']);
+
+
+    const CONTACTS_KEY = 'yl_clean_contacts_v1';
+    let contacts = load(CONTACTS_KEY, []); // {id,name,phone,address,lineId}
+    function normalizePhone(p){ return (p||'').replace(/\D+/g,''); }
+    function upsertContact(name, phone, address, lineId){
+      const np = normalizePhone(phone);
+      if(!name && !np) return;
+      const idx = contacts.findIndex(c => normalizePhone(c.phone)===np && np);
+      if(idx>=0){
+        // merge
+        contacts[idx].name = contacts[idx].name || name;
+        contacts[idx].address = contacts[idx].address || address;
+        contacts[idx].lineId = contacts[idx].lineId || lineId;
+      }else{
+        contacts.push({id: crypto.randomUUID(), name: name||'', phone: phone||'', address: address||'', lineId: lineId||''});
+      }
+      save(CONTACTS_KEY, contacts);
+      refreshContactsDatalist();
+    }
+    function findContactByName(name){
+      const n=(name||'').trim();
+      if(!n) return null;
+      const list = contacts.filter(c => (c.name||'')===n);
+      if(list.length===1) return list[0];
+      return null;
+    }
+    function findContactByPhone(phone){
+      const np = normalizePhone(phone);
+      if(!np) return null;
+      return contacts.find(c => normalizePhone(c.phone)===np) || null;
+    }
+    function refreshContactsDatalist(){
+      const dl = document.getElementById('contactsDL');
+      if(!dl) return;
+      dl.innerHTML = contacts.map(c => `<option value="${(c.name||'')}" label="${(c.phone||'')} ${(c.address||'')}"></option>`).join('');
+    }
+
+
+    // ---------- Init ----------
+    function initYearMonth(){
+      const yearSel = $('yearSel'), monthSel = $('monthSel');
+      const yearNow = new Date().getFullYear();
+      const years = []; for(let y=yearNow-3;y<=yearNow+3;y++) years.push(y);
+      yearSel.innerHTML = years.map(y=>`<option value="${y}" ${y===yearNow?'selected':''}>${y} 年</option>`).join('');
+      monthSel.innerHTML = Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}" ${m===today.getMonth()+1?'selected':''}>${m} 月</option>`).join('');
+      yearSel.onchange = monthSel.onchange = ()=>{ refreshTable(); refreshExpense(); };
+      $('showUndated').onchange = refreshTable;
+    }
+    function initFilters(){
+      $('staffFilter').innerHTML = ['全部',...staffList].map(s=>`<option value="${s==='全部'?'':s}">${s}</option>`).join('');
+      $('staffFilter').onchange = refreshTable;
+      $('statusFilter').onchange = refreshTable;
+      $('completedRange').onchange = refreshTable;
+      $('searchInput').addEventListener('input', refreshTable);
+    }
+    function initStaffSelects(){ $('staff').innerHTML = staffList.map(s=>`<option value="${s}">${s}</option>`).join(''); initFilters(); }
+    function initContactSelect(){ $('contactMethod').innerHTML = contactList.map(c=>`<option value="${c}">${c}</option>`).join(''); }
+    function initCheckboxes(){ renderChecks('slotGroup', SLOT_OPTS, 'slot'); renderChecks('contactTimesGroup', CONTACT_TIME_OPTS, 'contactTime'); renderChecks('acFloors', FLOOR_OPTS, 'acFloor'); renderChecks('washerFloors', FLOOR_OPTS, 'washerFloor'); }
+    function initExpenseCats(){ $('expCategory').innerHTML = expCats.map(c=>`<option value="${c}">${c}</option>`).join(''); }
+
+    // ---------- Pricing ----------
+    function calcTotal(f){
+      const acSplit=+f.acSplit||0, acDuct=+f.acDuct||0, washerTop=+f.washerTop||0, waterTank=+f.waterTank||0;
+      const pipesAmount=+f.pipesAmount||0, antiMold=+f.antiMold||0, ozone=+f.ozone||0, transformerCount=+f.transformerCount||0;
+      const longSplitCount=+f.longSplitCount||0, onePieceTray=+f.onePieceTray||0;
+      const splitTotal=acSplit*(acSplit>=3?1500:1800), ductTotal=acDuct*2800, washerTotal=washerTop*((acSplit+acDuct)>0?1800:2000);
+      const tankTotal=waterTank*1000, pipesTotal=Math.max(0,pipesAmount), antiMoldTotal=antiMold*(antiMold>=5?250:300);
+      const ozoneTotal=ozone*200, transformerTotal=transformerCount*500, longSplitTotal=longSplitCount*300, onePieceTotal=onePieceTray*500;
+      return Math.max(0, Math.round(splitTotal+ductTotal+washerTotal+tankTotal+pipesTotal+antiMoldTotal+ozoneTotal+transformerTotal+longSplitTotal+onePieceTotal));
+    }
+    function gatherForm(){
+      return {
+        id: $('id').value || crypto.randomUUID(),
+        staff:$('staff').value, date:$('date').value, time:$('time').value,
+        confirmed:$('confirmed')?.checked||false, quotationOk:$('quotationOk')?.checked||false,
+        customer:$('customer').value.trim(), lineId:$('lineId').value.trim(), phone:$('phone').value.trim(),
+        slots:getChecked('slot'), slotNote:$('slotNote')?.value.trim()||'', address:$('address').value.trim(),
+        residenceType:$('residenceType')?.value||'', residenceOther:$('residenceOther')?.value.trim()||'',
+        contactTimes:getChecked('contactTime'), contactTimeNote:$('contactTimeNote')?.value.trim()||'',
+        acFloors:getChecked('acFloor'), washerFloors:getChecked('washerFloor'),
+        contactMethod:$('contactMethod').value, status:$('status').value,
+        acSplit:+$('acSplit').value||0, acDuct:+$('acDuct').value||0, washerTop:+$('washerTop').value||0, waterTank:+$('waterTank').value||0,
+        pipesAmount:+$('pipesAmount').value||0, antiMold:+$('antiMold').value||0, ozone:+$('ozone').value||0,
+        transformerCount:+$('transformerCount').value||0, longSplitCount:+$('longSplitCount').value||0, onePieceTray:+$('onePieceTray').value||0,
+        note:$('note').value.trim(), total:+$('total').value||0, discount:+$('discount').value||0, netTotal:+$('netTotal').value||0,
+        createdAt:$('id').value ? undefined : new Date().toISOString()
+      };
+    }
+    function fillForm(o){
+      $('orderAccordion').open = true; $('orderAccordion').scrollIntoView({behavior:'smooth', block:'start'});
+      $('id').value=o.id||''; $('staff').value=o.staff||staffList[0];
+      $('date').value=o.date||''; $('time').value=o.time||'';
+      $('confirmed').checked=!!o.confirmed; $('quotationOk').checked=!!o.quotationOk;
+      $('customer').value=o.customer||''; $('lineId').value=o.lineId||''; $('phone').value=o.phone||'';
+      setChecked('slot', o.slots||[]); $('slotNote').value=o.slotNote||''; $('slotNote').classList.toggle('hidden', !((o.slots||[]).includes('日期指定') || (o.slots||[]).includes('時間指定'))); $('address').value=o.address||'';
+      $('residenceType').value=o.residenceType||''; $('residenceOther').value=o.residenceOther||''; $('residenceOther').classList.toggle('hidden', (o.residenceType||'')!=='其他');
+      setChecked('contactTime', o.contactTimes||[]); $('contactTimeNote').value=o.contactTimeNote||''; $('contactTimeNote').classList.toggle('hidden', !(o.contactTimes||[]).includes('時間指定'));
+      setChecked('acFloor', o.acFloors||[]); setChecked('washerFloor', o.washerFloors||[]);
+      $('contactMethod').value=o.contactMethod||contactList[0]; $('status').value=o.status||'排定';
+      $('acSplit').value=o.acSplit||0; $('acDuct').value=o.acDuct||0; $('washerTop').value=o.washerTop||0; $('waterTank').value=o.waterTank||0;
+      $('pipesAmount').value=o.pipesAmount||0; $('antiMold').value=o.antiMold||0; $('ozone').value=o.ozone||0;
+      $('transformerCount').value=o.transformerCount||0; $('longSplitCount').value=o.longSplitCount||0; $('onePieceTray').value=o.onePieceTray||0;
+      $('note').value=o.note||''; $('discount').value=o.discount||0; $('total').value=o.total||0; $('netTotal').value=o.netTotal||0;
+      $('deleteBtn').disabled=!o.id; $('formTitle').textContent=o.id?'編輯訂單':'新增訂單';
+      setFormLock(!!o.locked);
+      if(o.completedAt){ $('lockInfo').textContent = '完成於 ' + new Date(o.completedAt).toLocaleString(); }
+    }
+    function recalcTotals(){ const total=calcTotal(gatherForm()); $('total').value=total; const discount=Math.max(0,+$('discount').value||0); $('netTotal').value=Math.max(0,total-discount); }
+
+    function setFormLock(lock){
+      const ids=['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount','recalc'];
+      ids.forEach(id=>{ const el=$(id); if(el){ el.disabled = !!lock; el.readOnly = !!lock; }});
+      $('toggleLock').textContent = lock ? '解除鎖定（允許修改）' : '解鎖金額編輯';
+      $('lockInfo').textContent = lock ? '金額已鎖定（完成）' : '';
+    }
+
+
+    // ---------- Table & quick status ----------
+    function nextStatus(s){ const i=STATUS_FLOW.indexOf(s); return STATUS_FLOW[(i+1)%STATUS_FLOW.length]; }
+    function refreshTable(){
+      const y=+$('yearSel').value, m=+$('monthSel').value, staffF=$('staffFilter').value, statusF=$('statusFilter').value, showUndated=$('showUndated').checked;
+      const tbody=$('ordersTable').querySelector('tbody'); tbody.innerHTML='';
+      const q = ($('searchInput')?.value || '').trim();
+      const tokens = q ? q.split(/\s+/).map(t=>t.toLowerCase().replace(/\s|-/g,'')) : [];
+      searchTokens = (q ? q.split(/\s+/) : []).filter(Boolean); // for highlight (not normalized)
+      const hay = (o)=>[o.customer||'', o.phone||'', o.address||''].join(' ').toLowerCase().replace(/\s|-/g,'');
+      const range=$('completedRange').value;
+      const now=Date.now();
+      const filtered=orders.filter(o=>{
+        const s1=!staffF || o.staff===staffF; const s2=!statusF || o.status===statusF;
+        const condQuery = tokens.length===0 || tokens.every(t => hay(o).includes(t));
+        const condRange = !range || (o.completedAt && (now - new Date(o.completedAt).getTime()) <= (+range)*24*60*60*1000);
+        if(!o.date){ return showUndated && s1 && s2 && condQuery && condRange; }
+        const d=new Date(o.date); const ym=(d.getFullYear()===y && (d.getMonth()+1)===m);
+        return ym && s1 && s2 && condQuery && condRange;
+      }).sort((a,b)=>{
+        if(!a.date && b.date) return -1;
+        if(a.date && !b.date) return 1;
+        const dc = (a.date||'9999-99-99').localeCompare(b.date||'9999-99-99');
+        if(dc!==0) return dc;
+        if(!a.time && b.time) return -1;
+        if(a.time && !b.time) return 1;
+        return (a.time||'').localeCompare(b.time||'');
+      });
+
+      filtered.forEach((o,idx)=>{
+        const tr=document.createElement('tr');
+        const dateCell = o.date ? o.date : '<span class="badge-soft">未排期</span>';
+        tr.innerHTML=`
+          <td class="small muted">${idx+1}</td>
+          <td class="editable">${dateCell}</td>
+          <td class="editable">${o.time ? o.time : '<span class=\"badge-soft\">未排定</span>'}</td>
+          <td>${o.staff||''}</td>
+          <td>${o.customer||''}</td>
+          <td>${o.phone||''}</td>
+          <td>${(o.slots||[]).join('、')}</td>
+          <td>${o.address||''}</td>
+          <td></td>
+          <td class="toggle-confirm"></td>
+          <td class="toggle-quote"></td>
+          <td class="right-align">${fmtCurrency(o.total||0)}</td>
+          <td class="right-align">${fmtCurrency(o.netTotal||0)}</td>
+          <td>${o.contactMethod||''}</td>
+          <td class="op-cell"></td>`;
+        const st=o.status||'排定';
+        const span=document.createElement('span');
+        span.className='status ' + (st==='排定'?'P排定': st==='完成'?'C完成':'N未完成');
+        span.textContent=st; span.title='點一下快速切換狀況' + (o.completedAt? ('\n完成於：'+ new Date(o.completedAt).toLocaleString()) : '');
+        span.addEventListener('click',(ev)=>{
+          ev.stopPropagation();
+          const i=orders.findIndex(x=>x.id===o.id);
+          if(i>=0){ const prev=orders[i].status||'排定'; const next=nextStatus(prev); orders[i].status=next; if(next==='完成'){ orders[i].completedAt=new Date().toISOString(); orders[i].locked=true; } else { orders[i].completedAt=undefined; orders[i].locked=false; } save(KEY, orders); refreshTable(); }
+        });
+        tr.children[8].appendChild(span);
+        tr.addEventListener('click', ()=>{ fillForm(o); });
+        const dateTd = tr.children[1];
+        const timeTd = tr.children[2];
+        dateTd.addEventListener('click', (ev)=>{ ev.stopPropagation(); startInlineEdit(dateTd, 'date', o); });
+        timeTd.addEventListener('click', (ev)=>{ ev.stopPropagation(); startInlineEdit(timeTd, 'time', o); });
+        // highlight cells for search
+        tr.children[4].innerHTML = highlightText(o.customer||'');
+        tr.children[5].innerHTML = highlightPhone(o.phone||'');
+        tr.children[7].innerHTML = highlightText(o.address||'');
+        // render toggle confirm
+        const ctd = tr.querySelector('.toggle-confirm');
+        const qtd = tr.querySelector('.toggle-quote');
+        const cspan = renderTogglePill(ctd, !!o.confirmed, '已確認', '未確認');
+        const qspan = renderTogglePill(qtd, !!o.quotationOk, '已確認', '未確認');
+        cspan.addEventListener('click', (ev)=>{ ev.stopPropagation(); const i=orders.findIndex(x=>x.id===o.id); if(i>=0){ orders[i].confirmed = !orders[i].confirmed; save(KEY, orders); refreshTable(); }});
+        qspan.addEventListener('click', (ev)=>{ ev.stopPropagation(); const i=orders.findIndex(x=>x.id===o.id); if(i>=0){ orders[i].quotationOk = !orders[i].quotationOk; save(KEY, orders); refreshTable(); }});
+        // quick delete button
+        const op = tr.querySelector('.op-cell');
+        const copyBtn = document.createElement('button'); copyBtn.className='icon-btn'; copyBtn.textContent='複製';
+        copyBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); copyOrderFrom(o); });
+        op.appendChild(copyBtn);
+        const delBtn = document.createElement('button'); delBtn.className='icon-btn danger'; delBtn.textContent='刪除';
+        delBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); if(confirm('確定要刪除此訂單嗎？')){ orders = orders.filter(x=>x.id!==o.id); save(KEY, orders); refreshTable(); }});
+        op.appendChild(delBtn);
+        tbody.appendChild(tr);
+      });
+
+      // Summary
+      const sumEl=$('summary'); sumEl.innerHTML='';
+      // Only include dated orders of the selected month for sums
+      const monthly = orders.filter(o=> o.date && (new Date(o.date).getFullYear()===y) && (new Date(o.date).getMonth()+1===m));
+      const count=monthly.length, total=monthly.reduce((a,b)=>a+(+b.total||0),0), net=monthly.reduce((a,b)=>a+(+b.netTotal||0),0);
+      const done=monthly.filter(o=>o.status==='完成').length, pending=monthly.filter(o=>o.status!=='完成').length;
+      const undatedCount = orders.filter(o=>!o.date).length;
+      const monthExpense=expenses.filter(e=>{ if(!e.date) return false; const d=new Date(e.date); return d.getFullYear()===y && (d.getMonth()+1)===m; }).reduce((a,b)=>a+(+b.amount||0),0);
+      const mk=(t,v,h='')=>{const box=document.createElement('div');box.className='box';box.innerHTML=`<div class="small muted">${t}</div><div class="number">${v}</div>${h?`<div class="small muted">${h}</div>`:''}`;return box;};
+      sumEl.appendChild(mk('本月訂單數', count));
+      sumEl.appendChild(mk('本月總金額', fmtCurrency(total)));
+      sumEl.appendChild(mk('本月折後總金額', fmtCurrency(net)));
+      sumEl.appendChild(mk('本月花費', fmtCurrency(monthExpense)));
+      sumEl.appendChild(mk('本月淨收入', fmtCurrency(Math.max(0, net - monthExpense))));
+      sumEl.appendChild(mk('完成 / 未完成', `${done} / ${pending}`));
+      if(undatedCount>0) sumEl.appendChild(mk('未排期訂單數', undatedCount, '可勾選上方「顯示未排期」查看'));
+    }
+
+    
+    // ---------- Calendar Exports ----------
+    function toTwo(n){ return n.toString().padStart(2,'0'); }
+    function formatICSDateTimeLocal(dateStr, timeStr){
+      // Returns YYYYMMDDTHHMMSS for local time (floating). For better TZ, user can import and choose timezone in Google Calendar.
+      if(!dateStr) return '';
+      const d = new Date(dateStr + 'T' + (timeStr||'09:00') + ':00');
+      return d.getFullYear().toString()+toTwo(d.getMonth()+1)+toTwo(d.getDate())+'T'+toTwo(d.getHours())+toTwo(d.getMinutes())+'00';
+    }
+    function sanitizeText(t){ return (t||'').replace(/([,;])/g,'\\$1').replace(/\n/g,'\\n'); }
+
+    function buildICSFromOrders(list){
+      const lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Yuliang Clean Scheduler//v8//ZH-TW'
+      ];
+      list.forEach(o=>{
+        const dtStart = formatICSDateTimeLocal(o.date, o.time);
+        if(!dtStart) return;
+        // default duration 2 hours
+        const dtEnd = formatICSDateTimeLocal(o.date, o.time ? o.time : '11:00');
+        const title = sanitizeText(`${o.customer||'客戶'} 清洗安排`);
+        const staff = `作業人員：${o.staff||''}`;
+        const tel = `電話：${o.phone||''}`;
+        const slots = `時段：${(o.slots||[]).join('、')}`;
+        const price = `金額(折後)：${o.netTotal||o.total||0}`;
+        const note = o.note ? `備註：${o.note}` : '';
+        const desc = sanitizeText([staff, tel, slots, price, note].filter(Boolean).join('\\n'));
+        const loc = sanitizeText(o.address||'');
+        const uid = o.id || (dtStart + '@yl-clean');
+        lines.push('BEGIN:VEVENT');
+        lines.push('UID:'+uid);
+        lines.push('DTSTAMP:'+formatICSDateTimeLocal(new Date().toISOString().slice(0,10), new Date().toTimeString().slice(0,5)));
+        lines.push('DTSTART:'+dtStart);
+        lines.push('DTEND:'+dtEnd);
+        lines.push('SUMMARY:'+title);
+        if(loc) lines.push('LOCATION:'+loc);
+        if(desc) lines.push('DESCRIPTION:'+desc);
+        lines.push('END:VEVENT');
+      });
+      lines.push('END:VCALENDAR');
+      return lines.join('\r\n');
+    }
+
+    function exportICS(){
+      // rule: only include orders with date & time present, and either 已確認時間 或 狀況為「排定/完成」
+      const y=+$('yearSel').value, m=+$('monthSel').value;
+      const list = orders.filter(o=>{
+        if(!o.date || !o.time) return false;
+        const d=new Date(o.date);
+        const inMonth = d.getFullYear()===y && (d.getMonth()+1)===m;
+        const okStatus = ['排定','完成'].includes(o.status||'排定');
+        const okConfirm = !!o.confirmed;
+        return inMonth && okStatus && okConfirm;
+      });
+      if(list.length===0){ alert('本月沒有符合條件（已確認且有日期與時間）的訂單可匯出。'); return; }
+      const ics = buildICSFromOrders(list);
+      download(`行事曆_${y}-${toTwo(m)}.ics`, ics);
+    }
+
+    function exportGCalCsv(){
+      // Google Calendar CSV columns: Subject, Start Date, Start Time, End Date, End Time, All Day Event, Description, Location
+      const y=+$('yearSel').value, m=+$('monthSel').value;
+      const headers = ['Subject','Start Date','Start Time','End Date','End Time','All Day Event','Description','Location'];
+      const list = orders.filter(o=>{
+        if(!o.date || !o.time) return false;
+        const d=new Date(o.date);
+        const inMonth = d.getFullYear()===y && (d.getMonth()+1)===m;
+        const okStatus = ['排定','完成'].includes(o.status||'排定');
+        const okConfirm = !!o.confirmed;
+        return inMonth && okStatus && okConfirm;
+      });
+      if(list.length===0){ alert('本月沒有符合條件（已確認且有日期與時間）的訂單可匯出。'); return; }
+      const rows = list.map(o=>{
+        const startDate = o.date.replace(/-/g,'/'); // mm/dd/yyyy also works; we'll keep yyyy/mm/dd is okay for import in Google Calendar if locale matches
+        const startTime = o.time || '09:00';
+        // default 2 hours duration
+        const [hh,mm] = startTime.split(':').map(Number);
+        const endH = (hh+2)%24; const endDate = o.date; // simplistic; if crossing midnight, ignore for now
+        const endTime = (endH.toString().padStart(2,'0'))+':'+(mm.toString().padStart(2,'0'));
+        const subject = `${o.customer||'客戶'} 清洗安排`;
+        const staff = `作業人員：${o.staff||''}`;
+        const tel = `電話：${o.phone||''}`;
+        const slots = `時段：${(o.slots||[]).join('、')}`;
+        const price = `金額(折後)：${o.netTotal||o.total||0}`;
+        const note = o.note ? `備註：${o.note}` : '';
+        const desc = [staff, tel, slots, price, note].filter(Boolean).join('\\n');
+        const loc = o.address||'';
+        return [subject, startDate, startTime, endDate, endTime, 'False', desc, loc];
+      });
+      const csv = [headers.join(','), ...rows.map(r=>r.map(x=>{
+        const s=(x??'').toString();
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+      }).join(','))].join('\n');
+      download(`GoogleCalendar_${y}-${toTwo(m)}.csv`, csv);
+    }
+
+    
+    
+        // ---------- Excel Export (.xlsx) ----------
+    function exportXLSX(){
+      if (typeof XLSX === 'undefined'){
+        alert('Excel 程式庫尚未載入，請稍後或改用「匯出JSON」備份。');
+        return;
+      }
+      const y=+$('yearSel').value, m=+$('monthSel').value;
+      const pad2 = n => String(n).padStart(2,'0');
+
+      const inMonth = (dstr) => {
+        if(!dstr) return false;
+        const d = new Date(dstr);
+        return !isNaN(d) && d.getFullYear()===y && (d.getMonth()+1)===m;
+      };
+
+      // 訂單表（只取該年該月有日期者；未排期通常不列入月報表）
+      const orderHeaders = [
+        'id','作業人員','日期','時間','確認','報價單','姓名','LINE_ID','電話',
+        '安排時段(多選)','日期/時段備註','地址',
+        '居住地型態','居住地型態(其他)','方便聯繫時間(多選)','方便聯繫備註',
+        '冷氣樓層(多選)','洗衣機樓層(多選)','聯繫方式','狀況','完成時間','金額鎖定',
+        '分離式室內機','吊隱式','直立式洗衣機','水塔','自來水管金額','防霉噴劑','臭氧殺菌','變形金剛加價','長度>182cm加價','一體式水盤',
+        '備註','總金額','折扣金額','折後總金額','建立時間'
+      ];
+
+      const includeUndated = !!($('showUndated') && $('showUndated').checked);
+    const ORDERS_SRC = (typeof orders!=='undefined' && Array.isArray(orders)?orders:[]);
+    const orderRows = ORDERS_SRC
+      .filter(o => o.date ? inMonth(o.date) : includeUndated)
+        .sort((a,b)=> (a.date||'').localeCompare(b.date||''))
+        .map(o => [
+          o.id||'',
+          o.staff||'',
+          o.date||'',
+          o.time||'',
+          o.confirmed?'是':'否',
+          o.quotationOk?'是':'否',
+          o.customer||'',
+          o.lineId||'',
+          o.phone||'',
+          (o.slots||[]).join('|')||'',
+          o.slotNote||'',
+          o.address||'',
+          o.residenceType||'',
+          o.residenceOther||'',
+          (o.contactTimes||[]).join('|')||'',
+          o.contactTimeNote||'',
+          (o.acFloors||[]).join('|')||'',
+          (o.washerFloors||[]).join('|')||'',
+          o.contactMethod||'',
+          o.status||'',
+          o.completedAt||'',
+          o.locked?'是':'否',
+          +o.acSplit||0,
+          +o.acDuct||0,
+          +o.washerTop||0,
+          +o.waterTank||0,
+          +o.pipesAmount||0,
+          +o.antiMold||0,
+          +o.ozone||0,
+          +o.transformerCount||0,
+          +o.longSplitCount||0,
+          +o.onePieceTray||0,
+          (o.note||'').replace(/\n/g,' '),
+          +o.total||0,
+          +o.discount||0,
+          +o.netTotal||0,
+          o.createdAt||''
+        ]);
+
+      // 花費表
+      const expHeaders = ['id','日期','類別','說明','金額','建立時間'];
+      const expRows = (expenses||[])
+        .filter(e => inMonth(e.date))
+        .sort((a,b)=> (a.date||'').localeCompare(b.date||''))
+        .map(e => [ e.id||'', e.date||'', e.category||'', (e.note||'').replace(/\n/g,' '), +e.amount||0, e.createdAt||'' ]);
+
+      const wb = XLSX.utils.book_new();
+      const wsOrders = XLSX.utils.aoa_to_sheet([orderHeaders, ...orderRows]);
+      const wsExp = XLSX.utils.aoa_to_sheet([expHeaders, ...expRows]);
+
+      wsOrders['!cols'] = orderHeaders.map((_,i)=>({wch:[10,10,10,8,6,6,12,12,12,16,16,20,12,14,16,14,14,14,10,8,10,8,8,8,8,10,8,8,8,10,10,12,20,10,10,10,16][i]||12}));
+      wsExp['!cols'] = expHeaders.map((_,i)=>({wch:[10,10,10,24,10,16][i]||12}));
+
+      XLSX.utils.book_append_sheet(wb, wsOrders, '訂單');
+      XLSX.utils.book_append_sheet(wb, wsExp, '花費');
+      XLSX.writeFile(wb, `訂單_${y}-${pad2(m)}.xlsx`);
+    }
+
+    // ---------- Search highlight helpers ----------
+    let searchTokens = [];
+    function escapeHtml(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function highlightText(s){
+      let out = escapeHtml(s||'');
+      if(!searchTokens || searchTokens.length===0) return out;
+      searchTokens.forEach(tok => {
+        if(!tok) return;
+        const pattern = tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(`(${pattern})`, 'ig');
+        out = out.replace(re, '<mark>$1</mark>');
+      });
+      return out;
+    }
+    function highlightPhone(s){
+      const src = escapeHtml(s||'');
+      if(!searchTokens || searchTokens.length===0) return src;
+      let out = src;
+      searchTokens.forEach(tok => {
+        const digits = tok.replace(/\D+/g,'');
+        if(digits.length<3) return; // avoid over-highlighting
+        // Build a pattern that allows optional separators between each digit
+        const parts = digits.split('').map(ch => ch.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+        const pattern = parts.join('[\\s-]*');
+        const re = new RegExp(`(${pattern})`, 'ig');
+        out = out.replace(re, '<mark>$1</mark>');
+      });
+      return out;
+    }
+
+    // ---------- Inline edit for date/time in table ----------
+    // ---------- Quick toggle for Confirm / Quotation and quick delete ----------
+    function renderTogglePill(td, value, onText='已確認', offText='未確認'){
+      td.innerHTML = '';
+      const span = document.createElement('span');
+      span.className = 'checkpill ' + (value ? 'on' : 'off');
+      span.textContent = value ? onText : offText;
+      td.appendChild(span);
+      return span;
+    }
+
+    function startInlineEdit(td, kind, order){
+      if(td.querySelector('input')) return; // already editing
+      const input = document.createElement('input');
+      input.type = (kind === 'date') ? 'date' : 'time';
+      input.value = (kind === 'date') ? (order.date || '') : (order.time || '');
+      input.style.width = kind === 'date' ? '140px' : '110px';
+      input.addEventListener('click', e => e.stopPropagation());
+      td.innerHTML = '';
+      td.appendChild(input);
+      input.focus();
+      const commit = () => {
+        const val = (input.value || '').trim();
+        const idx = orders.findIndex(x => x.id === order.id);
+        if(idx >= 0){
+          if(kind === 'date') orders[idx].date = val;
+          else orders[idx].time = val;
+          save(KEY, orders);
+          refreshTable();
+        }
+      };
+      const cancel = () => refreshTable();
+      input.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter') commit();
+        if(e.key === 'Escape') cancel();
+      });
+      input.addEventListener('blur', commit);
+    }
+
+    // ---------- Orders save/delete/export/import ----------
+    function saveOrder(e){
+      e.preventDefault();
+      recalcTotals();
+      const data=gatherForm(); // 日期可留空
+      // handle completedAt & lock
+      if(data.status==='完成'){
+        data.completedAt = data.completedAt || new Date().toISOString();
+        data.locked = (data.locked!==false); // default lock when completed
+      } else {
+        data.completedAt = undefined; data.locked = false;
+      }
+      const idx=orders.findIndex(x=>x.id===data.id);
+      if(idx>=0){ orders[idx]={...orders[idx], ...data}; } else { orders.push(data); }
+      // upsert contact
+      upsertContact(data.customer, data.phone, data.address, data.lineId);
+      save(KEY, orders); refreshTable(); fillForm({}); refreshContactsDatalist();
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+    function deleteOrder(){
+      const id=$('id').value; if(!id) return;
+      if(confirm('確定要刪除這筆訂單嗎？')){
+        orders=orders.filter(o=>o.id!==id); save(KEY, orders); refreshTable(); fillForm({});
+      }
+    }
+    function resetForm(){ fillForm({}); }
+    function download(filename, text){ const blob=new Blob([text],{type:'application/octet-stream'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); }
+    function exportCSV(){
+      const headers=['id','作業人員','日期','時間','確認','報價單','姓名','LINE_ID','電話','安排時段(多選)','地址','冷氣樓屯(多選)','洗衣機樓層(多選)','聯繫方式','狀況','完成時間','金額鎖定','分離式室內機','吊隱式','直立式洗衣機','水塔','自來水管金額','防霉噴劑','臭氧殺菌','變形金剛加價','長度>182cm加價','一體式水盤','備註','總金額','折扣金額','折後總金額','建立時間'];
+      const rows=orders.map(o=>[o.id,o.staff,o.date||'',o.time,o.confirmed?'是':'否',o.quotationOk?'是':'否',o.customer,o.lineId,o.phone,(o.slots||[]).join('|'),o.address,(o.acFloors||[]).join('|'),(o.washerFloors||[]).join('|'),o.contactMethod,o.status,o.completedAt||'',o.locked?'是':'否',o.acSplit,o.acDuct,o.washerTop,o.waterTank,o.pipesAmount,o.antiMold,o.ozone,o.transformerCount,o.longSplitCount,o.onePieceTray,(o.note||'').replace(/\n/g,' '),o.total,o.discount,o.netTotal,o.createdAt||'']);
+      const csv=[headers.join(','),...rows.map(r=>r.map(x=>{const s=(x??'').toString();return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;}).join(','))].join('\n');
+      download(`訂單_${$('yearSel').value}-${pad2($('monthSel').value)}.csv`, csv);
+    }
+    function exportJSON(){ download(`訂單資料備份.json`, JSON.stringify({orders, staffList, contactList}, null, 2)); }
+    function importJSON(){ $('filePicker').click(); }
+    $('filePicker')?.addEventListener('change',(e)=>{
+      const file=e.target.files[0]; if(!file) return;
+      const reader=new FileReader(); reader.onload=()=>{ try{ const data=JSON.parse(reader.result);
+        if(data.orders && Array.isArray(data.orders)){ orders=data.orders; save(KEY, orders); }
+        if(data.staffList && Array.isArray(data.staffList)){ staffList=data.staffList; save(STAFF_KEY, staffList); initStaffSelects(); }
+        if(data.contactList && Array.isArray(data.contactList)){ contactList=data.contactList; save(CONTACT_KEY, contactList); initContactSelect(); }
+        refreshTable(); alert('匯入完成！'); }catch{ alert('匯入失敗：檔案格式不正確。'); } };
+      reader.readAsText(file,'utf-8'); e.target.value='';
+    });
+
+    // add staff/contact
+    function addStaff(){ const name=prompt('輸入新作業人員名稱：')?.trim(); if(!name) return; if(!staffList.includes(name)){ staffList.push(name); save(STAFF_KEY, staffList); initStaffSelects(); } $('staff').value=name; $('staffFilter').value=''; }
+    function addContact(){ const name=prompt('輸入新聯繫方式：')?.trim(); if(!name) return; if(!contactList.includes(name)){ contactList.push(name); save(CONTACT_KEY, contactList); initContactSelect(); } $('contactMethod').value=name; }
+
+    // ---------- Expense module ----------
+    function refreshExpense(){
+      const y = +$('yearSel').value, m = +$('monthSel').value;
+      const tbody = $('expenseTable').querySelector('tbody');
+      tbody.innerHTML = '';
+      const list = expenses
+        .filter(e => {
+          if(!e.date) return false;
+          const d = new Date(e.date);
+          if (isNaN(d)) return false;
+          return d.getFullYear()===y && (d.getMonth()+1)===m;
+        })
+        .sort((a,b)=> (a.date||'').localeCompare(b.date));
+      list.forEach((e, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${idx+1}</td>
+                        <td>${escapeHtml(e.date||'')}</td>
+                        <td>${escapeHtml(e.category||'')}</td>
+                        <td>${escapeHtml(e.note||'')}</td>
+                        <td class="right-align">${fmtCurrency(e.amount||0)}</td>`;
+        tr.addEventListener('click', ()=>fillExpForm(e));
+        tbody.appendChild(tr);
+      });
+    }
+    function gatherExpForm(){ return { id:$('expId').value || crypto.randomUUID(), date:$('expDate').value, category:$('expCategory').value, note:$('expNote').value.trim(), amount:+$('expAmount').value||0, createdAt:$('expId').value?undefined:new Date().toISOString() }; }
+    function fillExpForm(e){ $('expId').value=e.id||''; $('expDate').value=e.date||''; $('expCategory').value=e.category||expCats[0]; $('expNote').value=e.note||''; $('expAmount').value=e.amount||0; $('expDelete').disabled=!e.id; }
+    function saveExpense(ev){ ev.preventDefault(); const data=gatherExpForm(); if(!data.date){ alert('請輸入日期'); return; } const i=expenses.findIndex(x=>x.id===data.id); if(i>=0){ expenses[i]={...expenses[i], ...data}; } else { expenses.push(data); } save(EXP_KEY, expenses); fillExpForm({}); refreshExpense(); }
+    function deleteExpense(){ const id=$('expId').value; if(!id) return; if(confirm('確定要刪除這筆花費嗎？')){ expenses=expenses.filter(x=>x.id!==id); save(EXP_KEY, expenses); fillExpForm({}); refreshExpense(); } }
+    function expExportCsv(){ const headers=['id','日期','類別','說明','金額','建立時間']; const rows=expenses.map(e=>[e.id,e.date,e.category,(e.note||'').replace(/\n/g,' '),e.amount,e.createdAt||'']); const csv=[headers.join(','),...rows.map(r=>r.map(x=>{const s=(x??'').toString();return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;}).join(','))].join('\n'); download(`花費_${$('yearSel').value}-${pad2($('monthSel').value)}.csv`, csv); }
+    function expExportJson(){ download(`花費資料備份.json`, JSON.stringify({expenses, expCats}, null, 2)); }
+    function expImportJson(){ $('filePickerExp').click(); }
+    $('filePickerExp')?.addEventListener('change',(e)=>{
+      const file=e.target.files[0]; if(!file) return;
+      const reader=new FileReader(); reader.onload=()=>{ try{ const data=JSON.parse(reader.result);
+        if(data.expenses && Array.isArray(data.expenses)){ expenses=data.expenses; save(EXP_KEY, expenses); }
+        if(data.expCats && Array.isArray(data.expCats)){ expCats=data.expCats; save(EXP_CAT_KEY, expCats); initExpenseCats(); }
+        refreshExpense(); alert('花費匯入完成！'); }catch{ alert('匯入失敗：檔案格式不正確。'); } };
+      reader.readAsText(file,'utf-8'); e.target.value='';
+    });
+    function addExpCat(){ const name=prompt('輸入新花費類別：')?.trim(); if(!name) return; if(!expCats.includes(name)){ expCats.push(name); save(EXP_CAT_KEY, expCats); initExpenseCats(); } $('expCategory').value=name; }
+
+    // ---------- Events ----------
+    function attachEvents(){
+      // order form
+      $('orderForm').addEventListener('submit', saveOrder);
+      $('deleteBtn').addEventListener('click', deleteOrder);
+      $('resetBtn').addEventListener('click', resetForm);
+      $('recalc').addEventListener('click', recalcTotals);
+      ['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount']
+        .forEach(id => $(id).addEventListener('input', recalcTotals));
+      $('newBtn').addEventListener('click', ()=>{ fillForm({}); });
+$('exportJson').addEventListener('click', exportJSON);
+$('importJson').addEventListener('click', importJSON);
+      $('clearAll').addEventListener('click', ()=>{ if(confirm('確定要清空所有訂單資料嗎？此動作無法復原。')){ orders=[]; save(KEY, orders); refreshTable(); } });
+      $('addStaffBtn').addEventListener('click', addStaff);
+      $('addContactMethod').addEventListener('click', addContact);
+      
+      // Autofill from contacts when name/phone entered
+      $('customer').addEventListener('blur', ()=>{
+        const c = findContactByName($('customer').value);
+        if(c){ $('phone').value = c.phone||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
+      });
+      $('phone').addEventListener('blur', ()=>{
+        const c = findContactByPhone($('phone').value);
+        if(c){ if(!$('customer').value) $('customer').value = c.name||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
+      });
+
+
+      // expenses
+      $('expenseForm').addEventListener('submit', saveExpense);
+      $('expDelete').addEventListener('click', deleteExpense);
+      $('expReset').addEventListener('click', ()=>fillExpForm({}));
+      $('expExportCsv').addEventListener('click', expExportCsv);
+      $('expExportJson').addEventListener('click', expExportJson);
+      $('expImportJson').addEventListener('click', expImportJson);
+      $('expClear').addEventListener('click', ()=>{ if(confirm('確定要清空所有花費資料嗎？此動作無法復原。')){ expenses=[]; save(EXP_KEY, expenses); refreshExpense(); } });
+      $('addExpCat').addEventListener('click', addExpCat);
+
+      $('toggleLock').addEventListener('click', ()=>{
+        const id=$('id').value; if(!id){ alert('請先選擇或儲存一筆訂單'); return; }
+        const i=orders.findIndex(o=>o.id===id); if(i<0) return;
+        const wantUnlock = orders[i].locked;
+        if(wantUnlock && !confirm('確定要解除金額鎖定嗎？解除後可修改金額與折扣。')) return;
+        orders[i].locked = !orders[i].locked;
+        save(KEY, orders);
+        setFormLock(orders[i].locked);
+      });
+
+      // 複製相關
+      function copyOrderToForm(o){
+        const t={...o};
+        delete t.id; t.status='排定'; t.confirmed=false; t.quotationOk=false; t.completedAt=undefined; t.locked=false; t.date=''; t.time='';
+        fillForm(t); recalcTotals();
+        $('orderAccordion').open = true; $('orderAccordion').scrollIntoView({behavior:'smooth', block:'start'});
+      }
+      function copyOrderFrom(o){ copyOrderToForm(o); }
+      $('copyLastBtn').addEventListener('click', ()=>{
+        if(orders.length===0){ alert('目前沒有可複製的訂單'); return; }
+        const last = [...orders].sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''))[0];
+        if(!last){ alert('找不到上一筆'); return; }
+        copyOrderToForm(last);
+      });
+      $('copyFromHistoryBtn').addEventListener('click', ()=>{
+        const np = normalizePhone($('phone').value);
+        let cand = null;
+        if(np){ cand = [...orders].filter(o=> normalizePhone(o.phone)===np).sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''))[0]; }
+        if(!cand && $('customer').value){ cand = [...orders].filter(o=> (o.customer||'')=== $('customer').value.trim()).sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''))[0]; }
+        if(!cand){ alert('找不到此客戶的舊單（請先輸入姓名或電話）'); return; }
+        copyOrderToForm(cand);
+      });
+
+
+      // Accordion behavior: auto-collapse on small screens
+      function adjustAccordion(){
+        const acc = $('expenseAcc');
+        if(!acc) return;
+        if(window.innerWidth < 900){ acc.open = false; } else { acc.open = true; }
+      }
+      window.addEventListener('resize', adjustAccordion);
+      adjustAccordion();
+    
+      
+    
+      // residenceType toggle
+      $('residenceType')?.addEventListener('change', ()=>{
+        $('residenceOther').classList.toggle('hidden', $('residenceType').value!=='其他');
+      });
+      // contact time "時間指定" toggle
+      document.addEventListener('change', (e)=>{
+        if(e.target && e.target.matches('input[type="checkbox"][data-name="contactTime"]')){
+          const specified = Array.from(document.querySelectorAll('input[type="checkbox"][data-name="contactTime"]'))
+                              .some(x=> x.checked && (x.value==='日期指定' || x.value==='時間指定'));
+          $('contactTimeNote').classList.toggle('hidden', !specified);
+        }
+      });
+    
+    
+      // slot "時間指定" toggle
+      document.addEventListener('change', (e)=>{
+        if(e.target && e.target.matches('input[type="checkbox"][data-name="slot"]')){
+          const specified = Array.from(document.querySelectorAll('input[type="checkbox"][data-name="slot"]'))
+                              .some(x=> x.checked && (x.value==='日期指定' || x.value==='時間指定'));
+          $('slotNote').classList.toggle('hidden', !specified);
+        }
+      });
+    
+    
+      // auto-open orderAccordion when buttons clicked
+      ;['saveBtn','resetBtn','copyLastBtn','copyFromHistoryBtn'].forEach(id=>{
+        $(id)?.addEventListener('click', ()=>{ $('orderAccordion').open = true; $('orderAccordion').scrollIntoView({behavior:'smooth', block:'start'}); });
+      });
+    
+    
+      // 新增花費按鈕：切到花費區塊頂部並重置表單
+      $('newExpenseBtn')?.addEventListener('click', ()=>{
+        if (typeof fillExpForm === 'function') fillExpForm({});
+        const exp = $('expenseAcc');
+        if (exp){ exp.open = true; exp.scrollIntoView({behavior:'smooth', block:'start'}); }
+      });
+    
+    
+      // 新增訂單：展開並捲動到區塊開頭
+      $('newBtn')?.addEventListener('click', ()=>{
+        $('orderAccordion').open = true;
+        $('orderAccordion').scrollIntoView({behavior:'smooth', block:'start'});
+      });
+        
+    
+      $('exportXlsx')?.addEventListener('click', exportXLSX);
+    }
+
+    // ---------- Boot ----------
+    (function boot(){
+      initYearMonth(); initStaffSelects(); initContactSelect(); initCheckboxes(); initExpenseCats();
+      attachEvents(); refreshContactsDatalist(); fillForm({}); fillExpForm({}); refreshTable(); refreshExpense();
+    })();
+  </script>
+<script>
+/* ===== Offline .xlsx exporter (no external deps) =====
+   Builds a minimal XLSX (2 sheets) using uncompressed ZIP.
+   Sheets: 訂單 / 花費, with inline strings (no sharedStrings).
+*/
+(function(){
+  // --- helpers ---
+  const enc = new TextEncoder();
+  const toBytes = (s)=> enc.encode(s);
+
+  // CRC32
+  const CRC_TABLE = (()=>{
+    let c, table = new Uint32Array(256);
+    for (let n=0; n<256; n++){
+      c = n;
+      for (let k=0; k<8; k++){
+        c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+      }
+      table[n] = c >>> 0;
+    }
+    return table;
+  })();
+  function crc32(buf){
+    let c = 0 ^ (-1);
+    for (let i=0; i<buf.length; i++){
+      c = (c >>> 8) ^ CRC_TABLE[(c ^ buf[i]) & 0xFF];
+    }
+    return (c ^ (-1)) >>> 0;
+  }
+  function strToXml(s){
+    return (s||'').toString()
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/\r?\n/g, '&#10;');
+  }
+  function colName(col){ // 1->A, 2->B, ...
+    let s='', n=col;
+    while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); }
+    return s;
+  }
+  function sheetXML(headers, rows){
+    let r=1, out = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+      '<sheetData>'];
+    // header row
+    let cells = headers.map((h,i)=>`<c r="${colName(i+1)}${r}" t="inlineStr"><is><t>${strToXml(h)}</t></is></c>`).join('');
+    out.push(`<row r="${r}">${cells}</row>`); r++;
+    // data rows
+    for(const row of rows){
+      let cs=[];
+      for(let i=0;i<row.length;i++){
+        const v = row[i];
+        const ref = `${colName(i+1)}${r}`;
+        if(typeof v === 'number' && isFinite(v)){
+          cs.push(`<c r="${ref}"><v>${v}</v></c>`);
+        }else{
+          cs.push(`<c r="${ref}" t="inlineStr"><is><t>${strToXml(v)}</t></is></c>`);
+        }
+      }
+      out.push(`<row r="${r}">${cs.join('')}</row>`); r++;
+    }
+    out.push('</sheetData></worksheet>');
+    return out.join('');
+  }
+
+  // Minimal ZIP (store only)
+  function buildZip(files){ // files: [{name, data(Uint8Array)}]
+    const LFH = 0x04034b50, CDH=0x02014b50, EOCD=0x06054b50;
+    const arrs=[];
+    let offset=0;
+    const cdEntries=[];
+    function pushUint32(v){ const b=new Uint8Array(4); new DataView(b.buffer).setUint32(0,v,true); arrs.push(b); offset+=4; }
+    function pushUint16(v){ const b=new Uint8Array(2); new DataView(b.buffer).setUint16(0,v,true); arrs.push(b); offset+=2; }
+    function pushBytes(b){ arrs.push(b); offset+=b.length; }
+
+    for(const f of files){
+      const nameBytes = toBytes(f.name);
+      const data = f.data;
+      const crc = crc32(data);
+      const comp = 0; // store
+      const modTime = 0, modDate = 0;
+
+      // local file header
+      { pushUint32(LFH);
+        pushUint16(20);      // version needed
+        pushUint16(0);       // flags
+        pushUint16(comp);    // method
+        pushUint16(modTime); // time
+        pushUint16(modDate); // date
+        pushUint32(crc);
+        pushUint32(data.length); // compressed size (store)
+        pushUint32(data.length); // uncompressed size
+        pushUint16(nameBytes.length);
+        pushUint16(0); // extra len
+        pushBytes(nameBytes);
+        pushBytes(data);
+      }
+      const lfhEnd = offset;
+
+      // central directory entry
+      const cdStart = offset; // not used
+      const cd = [];
+      function push32(v){ const b=new Uint8Array(4); new DataView(b.buffer).setUint32(0,v,true); cd.push(b); }
+      function push16(v){ const b=new Uint8Array(2); new DataView(b.buffer).setUint16(0,v,true); cd.push(b); }
+      push32(CDH);
+      push16(20); // version made by
+      push16(20); // version needed
+      push16(0);  // flags
+      push16(comp);
+      push16(modTime); push16(modDate);
+      push32(crc);
+      push32(data.length); push32(data.length);
+      push16(nameBytes.length); push16(0); push16(0); // name, extra, comment
+      push16(0); push16(0); // disk start, int attrs
+      push32(0); // ext attrs
+      // relative offset of local header -> need to compute; we track by sum of previous arrays, so we store now:
+      const relOffset = lfhEnd - (30 + nameBytes.length + data.length);
+      push32(relOffset);
+      cd.push(nameBytes);
+      cdEntries.push(cd);
+    }
+
+    const cdOffset = offset;
+    for(const parts of cdEntries){ for(const b of parts){ arrs.push(b); offset+=b.length; } }
+    const cdSize = offset - cdOffset;
+
+    // EOCD
+    pushUint32(EOCD);
+    pushUint16(0); pushUint16(0); // disk numbers
+    pushUint16(files.length); pushUint16(files.length);
+    pushUint32(cdSize);
+    pushUint32(cdOffset);
+    pushUint16(0); // comment length
+
+    // concat
+    let total = 0; for(const a of arrs) total += a.length;
+    const out = new Uint8Array(total);
+    let p=0; for(const a of arrs){ out.set(a,p); p+=a.length; }
+    return out;
+  }
+
+  // Workbook XML pieces
+  function contentTypes(){
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`;
+  }
+  function rootRels(){
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+  }
+  function workbook(){
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="訂單" sheetId="1" r:id="rId1"/>
+    <sheet name="花費" sheetId="2" r:id="rId2"/>
+  </sheets>
+</workbook>`;
+  }
+  function workbookRels(){
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+</Relationships>`;
+  }
+
+  // Override existing function name
+  window.exportXLSX = function(){
+    const y = +$('yearSel').value, m = +$('monthSel').value;
+    const pad2 = n => String(n).padStart(2,'0');
+
+    const inMonth = (dstr) => {
+      if(!dstr) return false;
+      const d = new Date(dstr);
+      return !isNaN(d) && d.getFullYear()===y && (d.getMonth()+1)===m;
+    };
+
+    const orderHeaders = [
+      'id','作業人員','日期','時間','確認','報價單','姓名','LINE_ID','電話',
+      '安排時段(多選)','日期/時段備註','地址',
+      '居住地型態','居住地型態(其他)','方便聯繫時間(多選)','方便聯繫備註',
+      '冷氣樓層(多選)','洗衣機樓層(多選)','聯繫方式','狀況','完成時間','金額鎖定',
+      '分離式室內機','吊隱式','直立式洗衣機','水塔','自來水管金額','防霉噴劑','臭氧殺菌','變形金剛加價','長度>182cm加價','一體式水盤',
+      '備註','總金額','折扣金額','折後總金額','建立時間'
+    ];
+    const orderRows = (typeof orders!=='undefined' && Array.isArray(orders)?orders:[])
+      .filter(o => inMonth(o.date))
+      .sort((a,b)=> (a.date||'').localeCompare(b.date||''))
+      .map(o => [
+        o.id||'', o.staff||'', o.date||'', o.time||'',
+        o.confirmed?'是':'否', o.quotationOk?'是':'否', o.customer||'',
+        o.lineId||'', o.phone||'',
+        (o.slots||[]).join('|')||'', o.slotNote||'', o.address||'',
+        o.residenceType||'', o.residenceOther||'',
+        (o.contactTimes||[]).join('|')||'', o.contactTimeNote||'',
+        (o.acFloors||[]).join('|')||'', (o.washerFloors||[]).join('|')||'',
+        o.contactMethod||'', o.status||'', o.completedAt||'', o.locked?'是':'否',
+        +o.acSplit||0, +o.acDuct||0, +o.washerTop||0, +o.waterTank||0, +o.pipesAmount||0,
+        +o.antiMold||0, +o.ozone||0, +o.transformerCount||0, +o.longSplitCount||0, +o.onePieceTray||0,
+        (o.note||'').replace(/\n/g,' '), +o.total||0, +o.discount||0, +o.netTotal||0, o.createdAt||''
+      ]);
+
+    const expHeaders = ['id','日期','類別','說明','金額','建立時間'];
+    const expRows = (typeof expenses!=='undefined' && Array.isArray(expenses)?expenses:[])
+      .filter(e => inMonth(e.date))
+      .sort((a,b)=> (a.date||'').localeCompare(b.date||''))
+      .map(e => [e.id||'', e.date||'', e.category||'', (e.note||'').replace(/\n/g,' '), +e.amount||0, e.createdAt||'']);
+
+    // Build files
+    const files = [
+      {name:'[Content_Types].xml', data: toBytes(contentTypes())},
+      {name:'_rels/.rels', data: toBytes(rootRels())},
+      {name:'xl/workbook.xml', data: toBytes(workbook())},
+      {name:'xl/_rels/workbook.xml.rels', data: toBytes(workbookRels())},
+      {name:'xl/worksheets/sheet1.xml', data: toBytes(sheetXML(orderHeaders, orderRows))},
+      {name:'xl/worksheets/sheet2.xml', data: toBytes(sheetXML(expHeaders, expRows))},
+    ];
+    const zip = buildZip(files);
+    const blob = new Blob([zip], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `訂單_${y}-${pad2(m)}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  };
+})();
+</script>
+<script>
+// 重新綁定「匯出Excel」按鈕，避免沿用舊的 SheetJS 事件處理器
+window.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('exportXlsx');
+  if (btn && typeof window.exportXLSX === 'function') {
+    const clone = btn.cloneNode(true);           // 移除既有所有 listener
+    btn.parentNode.replaceChild(clone, btn);
+    clone.addEventListener('click', () => window.exportXLSX());
+  }
+});
+</script>
+</body>
+</html>
+
+<script>
+// 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
+window.addEventListener('DOMContentLoaded', () => {
+  const order = document.getElementById('orderAccordion');
+  const exp = document.getElementById('expenseAcc');
+  if (order) order.open = false;
+  if (exp) exp.open = false;
+});
+</script>
