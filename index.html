@@ -1516,34 +1516,6 @@ window.onload = () => {
   };
   document.body.appendChild(script);
 };
-    // 建立或取得「訂單排程備份」資料夾
-    const folderName = "訂單排程備份";
-    let folderId = null;
-    try {
-      const folderRes = await gapi.client.drive.files.list({
-        q: "mimeType='application/vnd.google-apps.folder' and name='" + folderName + "' and trashed = false",
-        fields: "files(id, name)",
-      });
-      if (folderRes.result.files && folderRes.result.files.length > 0) {
-        folderId = folderRes.result.files[0].id;
-        console.log("📁 已找到資料夾 ID：", folderId);
-      } else {
-        const createFolder = await gapi.client.drive.files.create({
-          resource: {
-            name: folderName,
-            mimeType: "application/vnd.google-apps.folder",
-          },
-          fields: "id",
-        });
-        folderId = createFolder.result.id;
-        console.log("📁 資料夾已建立，ID：", folderId);
-      }
-    } catch (err) {
-      console.error("❌ 資料夾建立失敗：", err);
-      alert("❌ 建立備份資料夾失敗，請檢查權限。");
-      return;
-    }
-
 </script></body>
 </html>
 <script>
