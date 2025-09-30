@@ -1468,6 +1468,13 @@ function gdriveInit() {
     }
   });
 }
+function localISODate(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 function uploadBackupToDrive() {
   const data = {
@@ -1477,10 +1484,7 @@ function uploadBackupToDrive() {
     exportedAt: new Date().toISOString()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const metadata = {
-    name: `清洗訂單_${new Date().toISOString().split('T')[0]}.json`,
-    mimeType: 'application/json'
-  };
+  const fileName = `清洗訂單_${localISODate()}.json`;
 
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
