@@ -1468,14 +1468,19 @@ function gdriveInit() {
     }
   });
 }
-function localISODate(){
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-  const fileName = `清洗訂單_${localISODate()}.json`;
+
+function uploadBackupToDrive() {
+  const data = {
+    orders: JSON.parse(localStorage.getItem('yl_clean_orders_v1') || '[]'),
+    staffList: JSON.parse(localStorage.getItem('yl_clean_staff_v1') || '[]'),
+    contactList: JSON.parse(localStorage.getItem('yl_clean_contact_v1') || '[]'),
+    exportedAt: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const metadata = {
+    name: `清洗訂單_${new Date().toISOString().split('T')[0]}.json`,
+    mimeType: 'application/json'
+  };
 
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
