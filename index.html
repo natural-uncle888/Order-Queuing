@@ -1447,6 +1447,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 <script>
 async function uploadBackupToDrive() {
+  console.log("🚀 開始備份流程...");
   try {
     const folderName = "訂單排程備份";
     const now = new Date();
@@ -1459,10 +1460,12 @@ async function uploadBackupToDrive() {
     const timestamp = `${yyyy}-${mm}-${dd}_${hh}-${min}-${ss}`;
     const fileName = `清洗訂單_${timestamp}.json`;
 
+    console.log("📦 準備備份檔案名稱：", fileName);
+
     const content = localStorage.getItem("orders") || "[]";
     const blob = new Blob([content], { type: "application/json" });
 
-    // 檢查是否已有「訂單排程備份」資料夾
+    console.log("🔍 檢查是否已有資料夾：", folderName);
     const folderResponse = await gapi.client.drive.files.list({
       q: "mimeType='application/vnd.google-apps.folder' and name='" + folderName + "' and trashed = false",
       fields: "files(id, name)",
@@ -1471,8 +1474,9 @@ async function uploadBackupToDrive() {
     let folderId = null;
     if (folderResponse.result.files && folderResponse.result.files.length > 0) {
       folderId = folderResponse.result.files[0].id;
+      console.log("📁 找到資料夾 ID：", folderId);
     } else {
-      // 如果沒有就建立
+      console.log("📁 沒找到，建立資料夾中...");
       const createFolder = await gapi.client.drive.files.create({
         resource: {
           name: folderName,
@@ -1481,6 +1485,7 @@ async function uploadBackupToDrive() {
         fields: "id",
       });
       folderId = createFolder.result.id;
+      console.log("✅ 資料夾建立完成，ID：", folderId);
     }
 
     const metadata = {
@@ -1489,6 +1494,7 @@ async function uploadBackupToDrive() {
       parents: [folderId],
     };
 
+    console.log("🧾 上傳中...");
     const form = new FormData();
     const boundary = "-------314159265358979323846";
     const delimiter = "\r\n--" + boundary + "\r\n";
@@ -1503,7 +1509,7 @@ async function uploadBackupToDrive() {
       await blob.text() +
       close_delim;
 
-    await gapi.client.request({
+    const uploadResult = await gapi.client.request({
       path: "/upload/drive/v3/files?uploadType=multipart",
       method: "POST",
       params: { uploadType: "multipart" },
@@ -1513,10 +1519,11 @@ async function uploadBackupToDrive() {
       body: multipartRequestBody,
     });
 
+    console.log("✅ 備份完成：", uploadResult);
     alert("✅ 備份成功，已上傳至 Google Drive「訂單排程備份」資料夾！");
   } catch (error) {
-    console.error("❌ 備份失敗：", error);
-    alert("❌ 備份失敗，請查看 Console 錯誤資訊。");
+    console.error("❌ 備份過程中出錯：", error);
+    alert("❌ 備份失敗，請打開 DevTools 查看 Console 詳細錯誤。");
   }
 }
 </script>
