@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
-<title>自然大叔 ∣ 訂單排程系統</title>
+<title>清洗訂單排程系統</title>
 <link href="https://res.cloudinary.com/dijzndzw2/image/upload/v1757176751/logo-3_hddq08.png" rel="icon" type="image/png"/>
 <style>
     :root{
@@ -1449,10 +1449,12 @@ const CLIENT_ID = '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleuser
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 let tokenClient, gapiInited = false, gisInited = false;
 
+// 初始化 GAPI client
 function gdriveInit() {
   gapi.load('client', async () => {
     await gapi.client.init({ apiKey: '', discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"] });
     gapiInited = true;
+    document.getElementById('gdriveBackupBtn').disabled = false;
   });
 
   tokenClient = google.accounts.oauth2.initTokenClient({
@@ -1468,6 +1470,7 @@ function gdriveInit() {
   });
 }
 
+// 上傳備份到 Google Drive
 function uploadBackupToDrive() {
   const data = {
     orders: JSON.parse(localStorage.getItem('yl_clean_orders_v1') || '[]'),
@@ -1477,7 +1480,14 @@ function uploadBackupToDrive() {
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const metadata = {
-    name: `清洗訂單_${new Date().toISOString().split('T')[0]}.json`,
+    const now = new Date();
+const dateStr = now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                String(now.getDate()).padStart(2, '0') + '_' +
+                String(now.getHours()).padStart(2, '0') + '-' +
+                String(now.getMinutes()).padStart(2, '0') + '-' +
+                String(now.getSeconds()).padStart(2, '0');
+name: `清洗訂單_${dateStr}.json`,
     mimeType: 'application/json'
   };
 
@@ -1501,20 +1511,32 @@ function uploadBackupToDrive() {
   });
 }
 
-document.getElementById('gdriveBackupBtn')?.addEventListener('click', () => {
-  if (!gapiInited) return alert('Google API 尚未初始化，請稍後再試');
-  tokenClient.requestAccessToken();
-});
-
-// 初始化
+// 綁定按鈕事件，按下才觸發授權流程
 window.onload = () => {
-  const script = document.createElement('script');
-  script.src = "https://accounts.google.com/gsi/client";
-  script.onload = () => {
+  const btn = document.getElementById('gdriveBackupBtn');
+  if (btn) btn.disabled = true;
+
+  const gsiScript = document.createElement('script');
+  gsiScript.src = "https://accounts.google.com/gsi/client";
+  gsiScript.onload = () => {
     gisInited = true;
     gdriveInit();
   };
-  document.body.appendChild(script);
+  document.body.appendChild(gsiScript);
+
+  const gapiScript = document.createElement('script');
+  gapiScript.src = "https://apis.google.com/js/api.js";
+  document.body.appendChild(gapiScript);
+
+  if (btn) {
+    btn.addEventListener('click', () => {
+      if (!gapiInited || !tokenClient) {
+        alert("Google API 尚未初始化完成，請稍後再試。");
+        return;
+      }
+      tokenClient.requestAccessToken();
+    });
+  }
 };
 </script></body>
 </html>
