@@ -138,7 +138,7 @@
 <strong>搜尋</strong>
 <input id="searchInput" placeholder="姓名 / 電話 / 地址" style="width:220px" type="text"/>
 </div>
-<div class="right"><button class="accent" id="gdriveBackupBtn">☁️Google</button>
+<div class="right"><button class="accent" disabled="true" id="backupBtn" onclick="uploadBackupToDrive()">☁️Google</button>
 <button class="accent" id="newBtn">新增訂單</button>
 <button id="newExpenseBtn">新增花費</button>
 <button id="exportJson">匯出JSON</button>
@@ -1445,7 +1445,39 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 <script src="https://apis.google.com/js/api.js"></script>
 
+
 <script>
+const CLIENT_ID = '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com';
+
+function initGoogleAPI() {
+  console.log("🔄 初始化 Google API 中...");
+  gapi.load('client:auth2', async () => {
+    try {
+      await gapi.client.init({
+        clientId: CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/drive.file'
+      });
+      console.log("✅ gapi.client.init 完成");
+
+      await gapi.client.load('drive', 'v3');
+      console.log("✅ gapi.client.drive 載入完成");
+
+      const isSignedIn = gapi.auth2.getAuthInstance().isSignedIn.get();
+      if (!isSignedIn) {
+        console.log("🔑 尚未登入，嘗試登入中...");
+        await gapi.auth2.getAuthInstance().signIn();
+      }
+
+      document.getElementById("backupBtn").disabled = false;
+      document.getElementById("backupBtn").onclick = uploadBackupToDrive;
+      console.log("☁️ 備份按鈕已啟用");
+    } catch (e) {
+      console.error("❌ 初始化失敗：", e);
+      alert("Google API 初始化失敗，請檢查網路或 Client ID。");
+    }
+  });
+}
+
 async function uploadBackupToDrive() {
   console.log("🚀 開始備份流程...");
   try {
@@ -1461,7 +1493,6 @@ async function uploadBackupToDrive() {
     const fileName = `清洗訂單_${timestamp}.json`;
 
     console.log("📦 準備備份檔案名稱：", fileName);
-
     const content = localStorage.getItem("orders") || "[]";
     const blob = new Blob([content], { type: "application/json" });
 
@@ -1527,6 +1558,7 @@ async function uploadBackupToDrive() {
   }
 }
 </script>
+<script async="" defer="" onload="initGoogleAPI()" src="https://apis.google.com/js/api.js"></script>
 </body>
 </html>
 <script>
