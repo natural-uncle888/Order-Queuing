@@ -1475,15 +1475,6 @@ function localISODate(){
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-
-function uploadBackupToDrive() {
-  const data = {
-    orders: JSON.parse(localStorage.getItem('yl_clean_orders_v1') || '[]'),
-    staffList: JSON.parse(localStorage.getItem('yl_clean_staff_v1') || '[]'),
-    contactList: JSON.parse(localStorage.getItem('yl_clean_contact_v1') || '[]'),
-    exportedAt: new Date().toISOString()
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const fileName = `清洗訂單_${localISODate()}.json`;
 
   const form = new FormData();
