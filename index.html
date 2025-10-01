@@ -1554,11 +1554,29 @@ function gdriveInit() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
-    callback: async (tokenResponse) => {
-      if (tokenResponse.error) {
-        alert('授權失敗');
-        return;
+callback: async (tokenResponse) => {
+  const token = tokenResponse.access_token;
+  setTimeout(() => {
+    Swal.fire({
+      title: '請選擇操作',
+      input: 'radio',
+      inputOptions: {
+        '1': '備份至 Google 雲端',
+        '2': '從 Google 雲端還原'
+      },
+      inputValidator: (value) => {
+        if (!value) return '請選擇一項操作';
+      },
+      confirmButtonText: '確定'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        const choice = result.value;
+        if (choice === '1') await backupToDrive(token);
+        else if (choice === '2') await restoreFromDrive(token);
       }
+    });
+  }, 0);
+},
       uploadBackupToDrive();
     }
   });
@@ -1660,8 +1678,7 @@ window.onload = () => {
     gdriveInit();
   };
   document.body.appendChild(script);
-};
-</script></body>
+};</script></body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
@@ -1682,16 +1699,29 @@ function initGoogleBackup() {
   const tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
     scope: 'https://www.googleapis.com/auth/drive.file',
-    callback: async (tokenResponse) => {
-      const token = tokenResponse.access_token;
-      \
-Swal.fire({
-  title: '請選擇操作',
-  input: 'radio',
-  inputOptions: {
-    '1': '備份至 Google 雲端',
-    '2': '從 Google 雲端還原'
-  },
+callback: async (tokenResponse) => {
+  const token = tokenResponse.access_token;
+  setTimeout(() => {
+    Swal.fire({
+      title: '請選擇操作',
+      input: 'radio',
+      inputOptions: {
+        '1': '備份至 Google 雲端',
+        '2': '從 Google 雲端還原'
+      },
+      inputValidator: (value) => {
+        if (!value) return '請選擇一項操作';
+      },
+      confirmButtonText: '確定'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        const choice = result.value;
+        if (choice === '1') await backupToDrive(token);
+        else if (choice === '2') await restoreFromDrive(token);
+      }
+    });
+  }, 0);
+},
   inputValidator: (value) => {
     if (!value) return '請選擇一項操作';
   },
@@ -1712,7 +1742,8 @@ Swal.fire({
       } else if (choice === '2') {
         await restoreFromDrive(token);
       }
-    },
+}, 0);
+},
   });
   tokenClient.requestAccessToken();
 }
@@ -1773,5 +1804,4 @@ if (!confirmed.isConfirmed) return;
 }
 
 // 綁定 ☁️Google 按鈕
-$('gdriveBackupBtn')?.addEventListener('click', initGoogleBackup);
-</script>
+$('gdriveBackupBtn')?.addEventListener('click', initGoogleBackup);</script>
