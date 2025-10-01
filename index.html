@@ -100,6 +100,43 @@
     details.accordion[open] > summary{border-bottom:1px solid var(--border)}
     details.accordion .content{padding:16px}
   </style>
+
+<script>
+window.__gisReady = !!(window.google && google.accounts && google.accounts.oauth2);
+window.waitForGISReady = function(timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    if (window.__gisReady) return resolve(true);
+    let elapsed = 0;
+    const iv = 50, timer = setInterval(() => {
+      elapsed += iv;
+      if (window.google && google.accounts && google.accounts.oauth2) {
+        window.__gisReady = true; clearInterval(timer); resolve(true);
+      } else if (elapsed >= timeoutMs) {
+        clearInterval(timer); reject(new Error('GIS not loaded'));
+      }
+    }, iv);
+  });
+};
+
+// 強化初始化（DOMContentLoaded 與 load 都嘗試）
+(function(){
+  function safeInit(){
+    try {
+      if (typeof gdriveInit === 'function') gdriveInit();
+      if (!window.tokenClient && window.google && google.accounts && google.accounts.oauth2 && window.CLIENT_ID) {
+        window.tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: window.CLIENT_ID,
+          scope: (window.SCOPES || 'https://www.googleapis.com/auth/drive.file'),
+          callback: () => {}
+        });
+      }
+    } catch(e) {}
+  }
+  document.addEventListener('DOMContentLoaded', safeInit);
+  window.addEventListener('load', safeInit);
+})();
+</script>
+
 </head>
 <body>
 <header>
@@ -138,8 +175,8 @@
 <strong>搜尋</strong>
 <input id="searchInput" placeholder="姓名 / 電話 / 地址" style="width:220px" type="text"/>
 </div>
-<div class="right"><button class="accent" id="gdriveBackupBtn">☁️Google</button>
-<button id="btnDriveRestore" class="btn-secondary" title="從 Google Drive 還原備份" onclick="window.handleDriveRestoreClick()">↓Google</button>
+<div class="right"><button class="accent" id="gdriveBackupBtn" onclick="window.handleGoogleAction('backup')">☁️Google</button>
+<button id="btnDriveRestore" class="btn-secondary" title="從 Google Drive 還原備份" onclick="window.handleGoogleAction(\'restore\')">↓Google</button>
 <button class="accent" id="newBtn">新增訂單</button>
 <button id="newExpenseBtn">新增花費</button>
 <button id="exportJson">匯出JSON</button>
@@ -1553,6 +1590,84 @@ window.handleDriveRestoreClick = function() {
     }
 
     // 在點擊的同步流程中直接要求 token，確保彈窗不被瀏覽器擋
+    window.tokenClient.requestAccessToken({ prompt: 'consent' });
+  } catch (e) {
+    console.error(e);
+    alert('無法啟動 Google 授權：' + (e && e.message ? e.message : e));
+  }
+};
+</script>
+
+
+<script>
+// 統一的 Google 授權 + 動作處理（與 ☁️/↓ 完全相同的彈窗時機與流程）
+window.handleGoogleAction = function(action /* 'backup' | 'restore' */) {
+  try {
+    // 先看是否已有 token（同樣的邏輯套用在兩顆按鈕）
+    var tok = (window.gapi && gapi.auth && typeof gapi.auth.getToken==='function') ? gapi.auth.getToken() : null;
+    var hasToken = !!(tok && tok.access_token);
+
+    function runAction() {
+      if (action === 'backup' && window.uploadBackupToDrive) return window.uploadBackupToDrive();
+      if (action === 'restore' && window.restoreBackupFromDrive) return window.restoreBackupFromDrive();
+      alert('找不到對應的動作: ' + action);
+    }
+
+    if (hasToken) {
+      return runAction();
+    }
+
+    // 若 GIS 尚未就緒，嘗試動態載入，並請使用者再按一次（兩顆按鈕行為相同）
+    if (!window.google || !google.accounts || !google.accounts.oauth2) {
+      var s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.onload = function(){
+        try { if (typeof gdriveInit === 'function') gdriveInit(); } catch(e){}
+        try {
+          if (!window.tokenClient && window.CLIENT_ID) {
+            window.tokenClient = google.accounts.oauth2.initTokenClient({
+              client_id: window.CLIENT_ID,
+              scope: (window.SCOPES || 'https://www.googleapis.com/auth/drive.file'),
+              callback: () => {}
+            });
+          }
+        } catch(e){}
+        alert('Google 身分服務已載入，請再按一次以授權。');
+      };
+      document.head.appendChild(s);
+      return;
+    }
+
+    // 確保 tokenClient 存在
+    if (!window.tokenClient && window.CLIENT_ID) {
+      window.tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: window.CLIENT_ID,
+        scope: (window.SCOPES || 'https://www.googleapis.com/auth/drive.file'),
+        callback: (resp) => {
+          if (resp && resp.access_token) {
+            try { if (window.gapi && gapi.auth && gapi.auth.setToken) gapi.auth.setToken({ access_token: resp.access_token }); } catch(e){}
+            runAction();
+          } else {
+            alert('授權失敗，請重試');
+          }
+        }
+      });
+    }
+
+    if (!window.tokenClient) {
+      alert('Google 身分服務尚未就緒（可能被阻擋）。請檢查網路或關閉阻擋彈窗後，再按一次。');
+      return;
+    }
+
+    // 在使用者手勢中觸發授權彈窗（☁️與↓一致）
+    window.tokenClient.callback = (resp) => {
+      if (resp && resp.access_token) {
+        try { if (window.gapi && gapi.auth && gapi.auth.setToken) gapi.auth.setToken({ access_token: resp.access_token }); } catch(e){}
+        runAction();
+      } else {
+        alert('授權失敗，請重試');
+      }
+    };
     window.tokenClient.requestAccessToken({ prompt: 'consent' });
   } catch (e) {
     console.error(e);
