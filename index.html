@@ -1673,31 +1673,9 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 <!-- 加入 Google API SDK -->
-<script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
 <script>
-function updateLastBackupTime() {
-  const now = new Date();
-  const str = now.getFullYear() + '/' +
-              String(now.getMonth() + 1).padStart(2, '0') + '/' +
-              String(now.getDate()).padStart(2, '0') + ' ' +
-              String(now.getHours()).padStart(2, '0') + ':' +
-              String(now.getMinutes()).padStart(2, '0');
-  const el = document.getElementById('lastBackupTime');
-  if (el) el.textContent = '最後備份：' + str;
-}
-
-
-
-let gapiToken = null; // 全域 token 儲存
-
-setInterval(() => {
-  if (gapiToken) {
-    backupToDrive(gapiToken, true); // 每 15 分鐘自動備份（靜默）
-    console.log('⏱️ 已自動備份至 Google Drive');
-  }
-}, 1000 * 60 * 15); // 每 15 分鐘執行一次
-
-
 const GOOGLE_CLIENT_ID = '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com';
 const BACKUP_FILE_NAME = 'cleaner_backup.json';
 
@@ -1707,29 +1685,7 @@ function initGoogleBackup() {
     scope: 'https://www.googleapis.com/auth/drive.file',
     callback: async (tokenResponse) => {
       const token = tokenResponse.access_token;
-      \
-Swal.fire({
-  title: '請選擇操作',
-  input: 'radio',
-  inputOptions: {
-    '1': '備份至 Google 雲端',
-    '2': '從 Google 雲端還原'
-  },
-  inputValidator: (value) => {
-    if (!value) return '請選擇一項操作';
-  },
-  confirmButtonText: '確定'
-}).then(async (result) => {
-  if (result.isConfirmed) {
-    const choice = result.value;
-    if (choice === '1') {
-      await backupToDrive(token);
-    } else if (choice === '2') {
-      await restoreFromDrive(token);
-    }
-  }
-});
-
+      const choice = prompt('請選擇操作：\n1 = 備份至 Google 雲端\n2 = 從 Google 雲端還原');
       if (choice === '1') {
         await backupToDrive(token);
       } else if (choice === '2') {
@@ -1740,7 +1696,7 @@ Swal.fire({
   tokenClient.requestAccessToken();
 }
 
-async function backupToDrive(token, silent = false) {
+async function backupToDrive(token) {
   const data = { orders, staffList, contactList, expenses, expCats };
   const metadata = { name: BACKUP_FILE_NAME, mimeType: 'application/json' };
   const form = new FormData();
@@ -1753,8 +1709,8 @@ async function backupToDrive(token, silent = false) {
     body: form,
   });
 
-  if (res.ok) { if (!silent) Swal.fire({ text: '✅ 備份完成！', icon: 'success' }); updateLastBackupTime(); } else if (!silent) Swal.fire({ text: '✅ 備份完成！', icon: 'success' });
-  else Swal.fire({ text: '❌ 備份失敗', icon: 'info' });
+  if (res.ok) alert('✅ 備份完成！');
+  else alert('❌ 備份失敗');
 }
 
 async function restoreFromDrive(token) {
@@ -1764,7 +1720,7 @@ async function restoreFromDrive(token) {
   );
   const list = await listRes.json();
   if (!list.files || list.files.length === 0) {
-    Swal.fire({ text: '找不到備份檔案', icon: 'info' });
+    alert('找不到備份檔案');
     return;
   }
 
@@ -1775,15 +1731,7 @@ async function restoreFromDrive(token) {
   );
   const data = await dataRes.json();
 
-  const confirmed = await Swal.fire({
-  title: '請確認',
-  text: '確認覆蓋本地資料並還原？',
-  icon: 'warning',
-  showCancelButton: true,
-  confirmButtonText: '確定',
-  cancelButtonText: '取消'
-});
-if (!confirmed.isConfirmed) return;
+  if (!confirm('確認覆蓋本地資料並還原？')) return;
 
   if (data.orders) { orders = data.orders; save(KEY, orders); }
   if (data.staffList) { staffList = data.staffList; save(STAFF_KEY, staffList); initStaffSelects(); }
@@ -1792,7 +1740,7 @@ if (!confirmed.isConfirmed) return;
   if (data.expCats) { expCats = data.expCats; save(EXP_CAT_KEY, expCats); }
 
   refreshTable(); refreshExpense();
-  Swal.fire({ text: '✅ 還原完成！', icon: 'info' });
+  alert('✅ 還原完成！');
 }
 
 // 綁定 ☁️Google 按鈕
