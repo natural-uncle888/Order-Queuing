@@ -100,7 +100,6 @@
     details.accordion[open] > summary{border-bottom:1px solid var(--border)}
     details.accordion .content{padding:16px}
   </style>
-<style>#btnDriveRestore{display:none!important;}</style>
 </head>
 <body>
 <header>
@@ -140,7 +139,6 @@
 <input id="searchInput" placeholder="姓名 / 電話 / 地址" style="width:220px" type="text"/>
 </div>
 <div class="right"><button class="accent" id="gdriveBackupBtn">☁️Google</button>
-<button id="btnDriveRestore" class="btn-secondary" title="從 Google Drive 還原備份">↓Google</button>
 <button class="accent" id="newBtn">新增訂單</button>
 <button id="newExpenseBtn">新增花費</button>
 <button id="exportJson">匯出JSON</button>
@@ -1466,7 +1464,7 @@ function gdriveInit() {
         alert('授權失敗');
         return;
       }
-      // (single-entry) token acquired; action chosen later
+      uploadBackupToDrive();
     }
   });
 }
@@ -1568,237 +1566,7 @@ window.onload = () => {
   };
   document.body.appendChild(script);
 };
-</script><script>
-
-function restoreBackupFromDrive() {
-  const BACKUP_FILENAME = '清洗訂單_備份.json';
-  try {
-    const tokenObj = gapi && gapi.auth && gapi.auth.getToken ? gapi.auth.getToken() : null;
-    const accessToken = tokenObj && tokenObj.access_token;
-    if (!accessToken) {
-      alert('請先點一次「☁️Google」進行登入/授權後再試。');
-      return;
-    }
-
-    if (!confirm('這會用雲端備份覆蓋本地資料（訂單/人員/聯絡方式）。要繼續嗎？')) return;
-
-    const headers = new Headers({ 'Authorization': 'Bearer ' + accessToken });
-    const query = encodeURIComponent(`name = '${BACKUP_FILENAME}' and trashed = false`);
-
-    // 先找最新的同名檔
-    fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&spaces=drive&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`, {
-      method: 'GET',
-      headers
-    })
-    .then(r => r.json())
-    .then(async listRes => {
-      const files = Array.isArray(listRes.files) ? listRes.files : [];
-      if (files.length === 0) {
-        alert('找不到雲端備份檔（清洗訂單_備份.json）。請先用「☁️Google」建立一次。');
-        return;
-      }
-      const fileId = files[0].id;
-      const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-        method: 'GET',
-        headers
-      });
-      if (!resp.ok) {
-        alert('下載備份失敗：' + (await resp.text()));
-        return;
-      }
-      const json = await resp.json();
-      const orders = Array.isArray(json.orders) ? json.orders : [];
-      const staffList = Array.isArray(json.staffList) ? json.staffList : [];
-      const contactList = Array.isArray(json.contactList) ? json.contactList : [];
-
-      localStorage.setItem('yl_clean_orders_v1', JSON.stringify(orders));
-      localStorage.setItem('yl_clean_staff_v1', JSON.stringify(staffList));
-      localStorage.setItem('yl_clean_contact_v1', JSON.stringify(contactList));
-
-      // 嘗試刷新 UI
-      try {
-        if (typeof refreshTable === 'function') refreshTable();
-        if (typeof rebuildSummary === 'function') rebuildSummary();
-      } catch (e) {/* 忽略 */}
-
-      alert('✅ 已從 Google 還原備份（本地資料已覆蓋）。');
-    })
-    .catch(err => {
-      console.error(err);
-      alert('❌ 還原過程發生錯誤。');
-    });
-  } catch (e) {
-    console.error(e);
-    alert('❌ 還原過程發生錯誤。');
-  }
-}
-
-// 綁定還原按鈕事件
-window.addEventListener('DOMContentLoaded', ()=>{
-  var btn = document.getElementById('btnDriveRestore');
-  if (btn) btn.addEventListener('click', restoreBackupFromDrive);
-});
-</script>
-
-<!-- injected: Single-entry chooser (fixed) -->
-<script>
-(function () {
-  async function showDriveActionChooser() {
-    const choice = prompt(
-      '要執行哪個動作？\n\n1 = 備份（上傳到 Google Drive）\n2 = 還原（從 Google Drive 覆蓋本機）\n\n按「取消」放棄。',
-      '2'
-    );
-    if (choice === null) return null;
-    const t = String(choice).trim();
-    if (t === '1') return 'upload';
-    if (t === '2') return 'restore';
-    alert('請輸入 1 或 2');
-    return null;
-  }
-
-  function isLocalDataLikelyEmpty() {
-    try {
-      const orders = JSON.parse(localStorage.getItem('yl_clean_orders_v1') || '[]');
-      const staff  = JSON.parse(localStorage.getItem('yl_clean_staff_v1') || '[]');
-      const contacts = JSON.parse(localStorage.getItem('yl_clean_contact_v1') || '[]');
-      return (orders.length + staff.length + contacts.length) <= 3;
-    } catch (e) { return true; }
-  }
-
-  async function driveHasBackup(headers) {
-    const BACKUP_FILENAME = '清洗訂單_備份.json';
-    const query = encodeURIComponent(`name='${BACKUP_FILENAME}' and trashed=false`);
-    const url   = `https://www.googleapis.com/drive/v3/files?q=${query}&spaces=drive&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`;
-    try {
-      const res = await fetch(url, { headers });
-      if (!res.ok) return false;
-      const json = await res.json();
-      return Array.isArray(json.files) && json.files.length > 0;
-    } catch (e) { return false; }
-  }
-
-  async function doRestoreFromDrive() {
-    const BACKUP_FILENAME = '清洗訂單_備份.json';
-    const tok = (window.gapi && gapi.auth && gapi.auth.getToken && gapi.auth.getToken()) || null;
-    const accessToken = tok && tok.access_token;
-    if (!accessToken) {
-      alert('尚未登入 Google，請重新點「☁️Google」。');
-      return;
-    }
-    if (!confirm('將以雲端備份覆蓋本機資料，確定要還原嗎？')) return;
-
-    const headers = new Headers({ 'Authorization': 'Bearer ' + accessToken });
-    const query = encodeURIComponent(`name='${BACKUP_FILENAME}' and trashed=false`);
-    const listURL = `https://www.googleapis.com/drive/v3/files?q=${query}&spaces=drive&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`;
-
-    try {
-      const listRes = await fetch(listURL, { headers });
-      if (!listRes.ok) { alert('查詢備份失敗'); return; }
-      const listJson = await listRes.json();
-      const files = Array.isArray(listJson.files) ? listJson.files : [];
-      if (files.length === 0) { alert('找不到雲端備份檔，請先建立備份。'); return; }
-
-      const fileId = files[0].id;
-      const dl = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers });
-      if (!dl.ok) { alert('下載備份失敗'); return; }
-      const data = await dl.json();
-
-      localStorage.setItem('yl_clean_orders_v1', JSON.stringify(Array.isArray(data.orders) ? data.orders : []));
-      localStorage.setItem('yl_clean_staff_v1', JSON.stringify(Array.isArray(data.staffList) ? data.staffList : []));
-      localStorage.setItem('yl_clean_contact_v1', JSON.stringify(Array.isArray(data.contactList) ? data.contactList : []));
-
-      try {
-        if (typeof refreshTable === 'function') refreshTable();
-        if (typeof rebuildSummary === 'function') rebuildSummary();
-      } catch (e) {}
-      alert('✅ 已從 Google 還原備份。');
-    } catch (err) {
-      console.error(err);
-      alert('❌ 還原過程發生錯誤。');
-    }
-  }
-
-  function wireSingleEntry() {
-    var restoreBtn = document.getElementById('btnDriveRestore');
-    if (restoreBtn) restoreBtn.style.display = 'none';
-
-    var mainBtn = document.getElementById('gdriveBackupBtn');
-    if (!mainBtn) return;
-
-    mainBtn.addEventListener('click', function(ev) {
-      ev.preventDefault();
-
-      if (!window.tokenClient) {
-        alert('Google API 尚未初始化，請稍後再試');
-        return;
-      }
-
-      // Overwrite callback just for this request
-      window.tokenClient.callback = async function(tokenResponse) {
-        if (tokenResponse && tokenResponse.error) {
-          alert('授權失敗，請重試。');
-          return;
-        }
-
-        const accessToken = (window.gapi && gapi.auth && gapi.auth.getToken && gapi.auth.getToken() && gapi.auth.getToken().access_token) || null;
-        if (!accessToken) {
-          alert('未取得存取權杖，請重試。');
-          return;
-        }
-        const headers = new Headers({ 'Authorization': 'Bearer ' + accessToken });
-
-        const action = await showDriveActionChooser();
-        if (!action) { alert('已取消。'); return; }
-
-        if (action === 'upload') {
-          if (isLocalDataLikelyEmpty() && await driveHasBackup(headers)) {
-            const goRestore = confirm('偵測到本機資料幾乎是空的，但雲端已有備份。\n建議先執行「還原」。要改為立即還原嗎？');
-            if (goRestore) { await doRestoreFromDrive(); return; }
-            const stillUpload = confirm('真的要上傳嗎？這可能覆蓋雲端備份。');
-            if (!stillUpload) return;
-          }
-          if (typeof uploadBackupToDrive === 'function') {
-            await uploadBackupToDrive();
-          } else {
-            alert('找不到上傳函式 uploadBackupToDrive()');
-          }
-        } else {
-          await doRestoreFromDrive();
-        }
-      };
-
-      try {
-        window.tokenClient.requestAccessToken({ prompt: '' });
-      } catch (e) {
-        alert('授權流程啟動失敗，請重試。');
-      }
-    }, { capture: true });
-  }
-
-  document.addEventListener('DOMContentLoaded', function() {
-    try {
-      var style = document.createElement('style');
-      style.textContent = "#btnDriveRestore{display:none !important;}";
-      document.head.appendChild(style);
-    } catch(e){}
-
-    let tries = 0;
-    const timer = setInterval(function() {
-      tries++;
-      if (window.tokenClient && document.getElementById('gdriveBackupBtn')) {
-        clearInterval(timer);
-        wireSingleEntry();
-      }
-      if (tries > 40) {
-        clearInterval(timer);
-        wireSingleEntry();
-      }
-    }, 100);
-  });
-})();
-</script>
-
-</body>
+</script></body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
