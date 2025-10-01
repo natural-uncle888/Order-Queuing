@@ -1670,7 +1670,110 @@ async function restoreFromDrive(token) {
     Swal.fire('❌ 還原錯誤', e.message, 'error');
   }
 }
-</script></body>
+</script><script>
+    async function uploadToGoogleCalendar(i) {
+      const name = document.getElementById(`name_${i}`)?.value || "";
+      const address = document.getElementById(`address_${i}`)?.value || "";
+      const date = document.getElementById("date")?.value || "";
+      const time = document.getElementById("time")?.value || "";
+      const cleanItems = Array.from(document.querySelectorAll(`#item_${i} input[type=checkbox]:checked`))
+        .map(el => el.value).join(", ");
+      const residence = document.getElementById(`type_${i}`)?.value || "";
+      const floor = document.getElementById(`floor_${i}`)?.value || "";
+
+      if (!name || !date || !time) {
+        Swal.fire("資料不完整", "請確認姓名、日期與時間欄位都有填寫", "warning");
+        return;
+      }
+
+      const { value: duration } = await Swal.fire({
+        title: `輸入 ${name} 的時長（分鐘）`,
+        input: "number",
+        inputLabel: "請輸入預計清洗時長",
+        inputPlaceholder: "例如：90",
+        confirmButtonText: "確定上傳",
+        inputValidator: (v) => (!v || isNaN(v) || v <= 0) ? "請輸入有效的分鐘數" : null
+      });
+      if (!duration) return;
+
+      const start = new Date(`${date}T${time}`);
+      const end = new Date(start.getTime() + duration * 60000);
+      const event = {
+        summary: name,
+        location: address,
+        description: `清洗項目：${cleanItems}\n居住地型態：${residence}\n樓層位置：${floor}`,
+        start: { dateTime: start.toISOString() },
+        end: { dateTime: end.toISOString() }
+      };
+
+      if (!gapi.auth2 || !gapi.auth2.getAuthInstance().isSignedIn.get()) {
+        Swal.fire("尚未登入 Google", "請先登入 Google 才能上傳日曆", "info");
+        return;
+      }
+
+      gapi.client.calendar.events.insert({
+        calendarId: "primary",
+        resource: event
+      }).then(() => {
+        Swal.fire("✅ 已上傳", `${name} 的清洗行程已加入日曆`, "success");
+      }).catch((err) => {
+        Swal.fire("❌ 上傳失敗", err.message || "請稍後再試", "error");
+      });
+    }
+    </script><script>
+    async function handleCalendarUpload(button) {
+      const row = button.closest("tr");
+      const i = Array.from(document.querySelectorAll("table tbody tr")).indexOf(row) + 1;
+
+      const name = document.getElementById(`name_${i}`)?.value || "";
+      const address = document.getElementById(`address_${i}`)?.value || "";
+      const date = document.getElementById("date")?.value || "";
+      const time = document.getElementById("time")?.value || "";
+      const cleanItems = Array.from(document.querySelectorAll(`#item_${i} input[type=checkbox]:checked`))
+        .map(el => el.value).join(", ");
+      const residence = document.getElementById(`type_${i}`)?.value || "";
+      const floor = document.getElementById(`floor_${i}`)?.value || "";
+
+      if (!name || !date || !time) {
+        Swal.fire("資料不完整", "請確認姓名、日期與時間欄位都有填寫", "warning");
+        return;
+      }
+
+      const { value: duration } = await Swal.fire({
+        title: `輸入 ${name} 的時長（分鐘）`,
+        input: "number",
+        inputLabel: "請輸入預計清洗時長",
+        inputPlaceholder: "例如：90",
+        confirmButtonText: "確定上傳",
+        inputValidator: (v) => (!v || isNaN(v) || v <= 0) ? "請輸入有效的分鐘數" : null
+      });
+      if (!duration) return;
+
+      const start = new Date(`${date}T${time}`);
+      const end = new Date(start.getTime() + duration * 60000);
+      const event = {
+        summary: name,
+        location: address,
+        description: `清洗項目：${cleanItems}\n居住地型態：${residence}\n樓層位置：${floor}`,
+        start: { dateTime: start.toISOString() },
+        end: { dateTime: end.toISOString() }
+      };
+
+      if (!gapi.auth2 || !gapi.auth2.getAuthInstance().isSignedIn.get()) {
+        Swal.fire("尚未登入 Google", "請先登入 Google 才能上傳日曆", "info");
+        return;
+      }
+
+      gapi.client.calendar.events.insert({
+        calendarId: "primary",
+        resource: event
+      }).then(() => {
+        Swal.fire("✅ 已上傳", `${name} 的清洗行程已加入日曆`, "success");
+      }).catch((err) => {
+        Swal.fire("❌ 上傳失敗", err.message || "請稍後再試", "error");
+      });
+    }
+    </script></body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
@@ -1682,4 +1785,47 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 <!-- 加入 Google API SDK -->
-<script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
+<script async="" defer="" src="https://accounts.google.com/gsi/client">
+function insertCalendarButtonToEditor() {
+  const saveBtn = document.querySelector("#saveEditButton");
+  if (!saveBtn) return;
+
+  // 如果已經插入，就不再插入
+  if (document.querySelector("#calendarUploadBtnInEditor")) return;
+
+  const calendarBtn = document.createElement("button");
+  calendarBtn.textContent = "📆 加入日曆";
+  calendarBtn.className = "btn btn-outline-success";
+  calendarBtn.id = "calendarUploadBtnInEditor";
+  calendarBtn.style.marginLeft = "10px";
+  calendarBtn.style.display = "inline-block";
+  calendarBtn.onclick = function () {
+    handleCalendarUploadFromEditor();
+  };
+
+  // 插在儲存按鈕後面，而不是包在一起，避免被樣式排擠
+  saveBtn.insertAdjacentElement("afterend", calendarBtn);
+}
+
+
+
+function insertCalendarButtonToEditor() {
+  const saveBtn = document.querySelector("#saveEditButton");
+  if (!saveBtn) return;
+
+  if (document.querySelector("#calendarUploadBtnInEditor")) return;
+
+  const calendarBtn = document.createElement("button");
+  calendarBtn.textContent = "📆 加入日曆";
+  calendarBtn.className = "btn btn-outline-success";
+  calendarBtn.id = "calendarUploadBtnInEditor";
+  calendarBtn.style.marginLeft = "10px";
+  calendarBtn.onclick = function () {
+    handleCalendarUploadFromEditor();
+  };
+
+  saveBtn.parentNode.appendChild(calendarBtn);
+}
+
+
+</script>
