@@ -1577,6 +1577,64 @@ function initGoogleBackup() {
   if (!tokenClient) initGoogle();
   tokenClient.requestAccessToken();
 }
+</script><script>
+async function backupToDrive(token) {
+  try {
+    const content = JSON.stringify(localStorage, null, 2);
+    const file = new Blob([content], { type: 'application/json' });
+    const metadata = {
+      name: '清洗訂單_備份.json',
+      mimeType: 'application/json'
+    };
+
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', file);
+
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+      method: 'POST',
+      headers: new Headers({ Authorization: 'Bearer ' + token }),
+      body: form
+    });
+
+    if (res.ok) {
+      Swal.fire('✅ 備份成功', '', 'success');
+    } else {
+      const err = await res.json();
+      Swal.fire('❌ 備份失敗', err.error.message, 'error');
+    }
+  } catch (e) {
+    Swal.fire('❌ 備份錯誤', e.message, 'error');
+  }
+}
+
+async function restoreFromDrive(token) {
+  try {
+    // 找出最新的「清洗訂單_備份.json」檔案
+    const listRes = await fetch("https://www.googleapis.com/drive/v3/files?q=name='清洗訂單_備份.json' and trashed=false&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc", {
+      headers: new Headers({ Authorization: 'Bearer ' + token })
+    });
+    const listJson = await listRes.json();
+    const file = listJson.files?.[0];
+    if (!file) return Swal.fire('⚠️ 找不到備份檔', '', 'warning');
+
+    // 下載備份檔案內容
+    const downloadRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+      headers: new Headers({ Authorization: 'Bearer ' + token })
+    });
+    const data = await downloadRes.json();
+
+    // 寫入 localStorage
+    localStorage.clear();
+    for (const [key, value] of Object.entries(data)) {
+      localStorage.setItem(key, value);
+    }
+
+    Swal.fire('✅ 還原成功', '', 'success').then(() => location.reload());
+  } catch (e) {
+    Swal.fire('❌ 還原錯誤', e.message, 'error');
+  }
+}
 </script></body>
 </html>
 <script>
@@ -1590,4 +1648,3 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 <!-- 加入 Google API SDK -->
 <script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
-
