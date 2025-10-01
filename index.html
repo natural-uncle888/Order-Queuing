@@ -1624,7 +1624,223 @@ async function backupToDrive(token) {
     Swal.fire('❌ 備份錯誤', e.message, 'error');
   }
 }
-</script></body>
+</script><script>
+async function restoreFromDrive(token) {
+  try {
+    // 搜尋兩個備份檔案
+    const query = "name contains '清洗訂單_備份_' and trashed=false";
+    const listRes = await fetch("https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(query) + "&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc", {
+      headers: new Headers({ Authorization: 'Bearer ' + token })
+    });
+    const listJson = await listRes.json();
+    const files = listJson.files || [];
+
+    if (files.length === 0) {
+      return Swal.fire('⚠️ 找不到任何備份檔', '', 'warning');
+    }
+
+    const inputOptions = {};
+    files.slice(0, 2).forEach(file => {
+      const time = new Date(file.modifiedTime).toLocaleString();
+      inputOptions[file.id] = `${file.name}（${time}）`;
+    });
+
+    const { value: fileId } = await Swal.fire({
+      title: '選擇要還原的備份檔',
+      input: 'radio',
+      inputOptions,
+      inputValidator: (value) => !value && '請選擇一個檔案',
+      confirmButtonText: '還原'
+    });
+
+    if (!fileId) return;
+
+    const downloadRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      headers: new Headers({ Authorization: 'Bearer ' + token })
+    });
+    const data = await downloadRes.json();
+
+    localStorage.clear();
+    for (const [key, value] of Object.entries(data)) {
+      localStorage.setItem(key, value);
+    }
+
+    Swal.fire('✅ 還原成功', '', 'success').then(() => location.reload());
+  } catch (e) {
+    Swal.fire('❌ 還原錯誤', e.message, 'error');
+  }
+}
+</script>
+<!-- BEGIN: GCal Direct Upload Patch -->
+<style>
+  .icon-btn{ border:1px solid #ddd; background:#fff; padding:6px 8px; border-radius:8px; cursor:pointer; }
+  .icon-btn:hover{ background:#f7f7f7; }
+  .icon-btn svg{ width:18px; height:18px; vertical-align:middle; }
+</style>
+
+<script>
+// ===== Google Calendar Direct Upload (checkbox-selected orders) =====
+// !!! 將下方兩個常數換成你自己的憑證（Google Cloud Console 建立 OAuth Web 用戶端並啟用 Calendar API）
+const GAPI_CLIENT_ID = "894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com"; // 必填
+const GAPI_API_KEY   = "YOUR_API_KEY"; // 建議填
+const GAPI_DISCOVERY = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
+const GAPI_SCOPES    = "https://www.googleapis.com/auth/calendar.events";
+
+function getAllOrders(){ return (window.orders||[]); }
+
+// 插入單圖示按鈕到 ☁️Google 左邊
+function injectUploadBtn(){
+  const gBtn = document.getElementById('gdriveBackupBtn');
+  if(!gBtn || document.getElementById('uploadToGCalBtn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'uploadToGCalBtn';
+  btn.className = 'icon-btn';
+  btn.type = 'button';
+  btn.title = '一鍵上傳到 Google 日曆（勾選）';
+  btn.setAttribute('aria-label','上傳到 Google 日曆');
+  btn.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 2v3M16 2v3M3.5 9h17"/>
+      <rect x="3.5" y="7" width="17" height="13" rx="2"/>
+      <path d="M8.5 15h7"/>
+      <path d="M6 20c-2.2 0-4-1.7-4-3.8 0-1.7 1.1-3.2 2.8-3.7.5-2.5 2.7-4.3 5.3-4.3 2.3 0 4.3 1.4 5.1 3.5 1.9.1 3.4 1.7 3.4 3.6 0 2-1.7 3.7-3.8 3.7"/>
+    </svg>`;
+  gBtn.parentNode.insertBefore(btn, gBtn);
+  btn.addEventListener('click', onUploadToCalendarClick);
+}
+
+// 表頭加全選；若你的 refreshTable 已加每列 checkbox，這裡只負責表頭
+function ensureSelectColumnExists(){
+  const thead = document.querySelector('table thead tr');
+  if(thead && !thead.querySelector('#selAllForUpload')){
+    const th = document.createElement('th');
+    th.innerHTML = '<input type="checkbox" id="selAllForUpload">';
+    thead.insertBefore(th, thead.firstElementChild);
+    const selAll = th.querySelector('#selAllForUpload');
+    selAll.addEventListener('change', ()=>{
+      document.querySelectorAll('input.rowSel').forEach(ch=> ch.checked = selAll.checked);
+    });
+  }
+}
+
+// 後置補丁：若每列沒有 .rowSel，就在最左插一格（避免動原有模板也能用）
+function backfillRowCheckboxes(){
+  document.querySelectorAll('table tbody tr').forEach((tr, idx)=>{
+    if(tr.querySelector('input.rowSel')) return;
+    const o = (window.orders||[])[idx];
+    const rowId = o && (o.id||'');
+    const td = document.createElement('td');
+    td.innerHTML = `<input type="checkbox" class="rowSel" data-id="${rowId}">`;
+    tr.insertBefore(td, tr.firstElementChild);
+  });
+}
+
+function getSelectedOrders(){
+  const ids = Array.from(document.querySelectorAll('input.rowSel:checked'))
+    .map(el => el.getAttribute('data-id'))
+    .filter(Boolean);
+  if(ids.length===0) return [];
+  const set = new Set(ids.map(String));
+  return getAllOrders().filter(o => set.has(String(o.id)));
+}
+
+function buildEventFromOrder(o, minutes){
+  const tz = 'Asia/Taipei';
+  const date = o.date;
+  const time = o.time || '09:00';
+  const start = new Date(`${date}T${time}:00`);
+  const end   = new Date(start.getTime() + (minutes*60000));
+  const pad2 = n => String(n).padStart(2,'0');
+  const toRFC3339 = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00`;
+
+  const fields = {
+    '日期': o.date || '',
+    '時間': o.time || '',
+    '客戶': o.customer || '',
+    '電話': o.phone || '',
+    '地址': o.address || '',
+    '清洗項目': (o.cleanItems||o.items||'') || '',
+    '居住地型態': o.houseType || '',
+    '冷氣位於樓層': o.acFloor || '',
+    '洗衣機位於樓層': o.wmFloor || ''
+  };
+  const desc = Object.entries(fields)
+    .filter(([,v]) => v!==undefined && v!==null && String(v).trim()!=='')
+    .map(([k,v]) => `${k}：${Array.isArray(v)? v.join('、') : v}`)
+    .join('\n');
+
+  return {
+    summary: `${o.customer||'客戶'} 清洗`,
+    location: o.address || '',
+    description: desc,
+    start: { dateTime: toRFC3339(start), timeZone: tz },
+    end:   { dateTime: toRFC3339(end),   timeZone: tz },
+  };
+}
+
+async function onUploadToCalendarClick(){
+  const picked = getSelectedOrders().filter(o => o && o.date && o.time);
+  if(picked.length===0){
+    alert('請先勾選，且必須是「已填日期與時間」的訂單。');
+    return;
+  }
+  const defMinutes = 120;
+  const input = prompt('請輸入行程時長（分鐘）', String(defMinutes));
+  if(input===null) return;
+  const minutes = Math.max(1, parseInt(input,10)||defMinutes);
+
+  try{
+    await ensureGapiLoaded();
+    await ensureSignedIn();
+    const calendarId = 'primary';
+    let ok = 0;
+    for(const o of picked){
+      const ev = buildEventFromOrder(o, minutes);
+      await gapi.client.calendar.events.insert({ calendarId, resource: ev });
+      ok++;
+    }
+    alert(`已上傳 ${ok} 筆到 Google 日曆（${calendarId}）。`);
+  }catch(err){
+    console.error(err);
+    const msg = (err && err.result && err.result.error && err.result.error.message) || err.message || String(err);
+    alert('上傳失敗：' + msg);
+  }
+}
+
+// gapi 載入與授權
+let gapiLoaded = false;
+function loadGapiScript(){
+  return new Promise((resolve, reject)=>{
+    if(document.getElementById('gapiScript')) return resolve();
+    const s = document.createElement('script');
+    s.id = 'gapiScript';
+    s.src = 'https://apis.google.com/js/api.js';
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+async function ensureGapiLoaded(){
+  if(gapiLoaded) return;
+  await loadGapiScript();
+  await new Promise(res=> gapi.load('client:auth2', res));
+  await gapi.client.init({ apiKey: GAPI_API_KEY, discoveryDocs: GAPI_DISCOVERY, clientId: GAPI_CLIENT_ID, scope: GAPI_SCOPES });
+  gapiLoaded = true;
+}
+async function ensureSignedIn(){
+  const auth = gapi.auth2.getAuthInstance();
+  if(!auth.isSignedIn.get()){
+    await auth.signIn();
+  }
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  injectUploadBtn();
+  ensureSelectColumnExists();
+  setTimeout(backfillRowCheckboxes, 100);
+});
+</script>
+<!-- END: GCal Direct Upload Patch -->
+</body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
