@@ -1534,6 +1534,6 @@ window.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('DOMContentLoaded', () => {
   try { if (typeof gdriveInit === 'function') gdriveInit(); } catch(e){}
   const btn = document.getElementById('btnDriveRestore');
-  if (btn) btn.addEventListener('click', restoreBackupFromDrive);
+  if (btn) btn.addEventListener('click', ()=>{ if (window.restoreBackupFromDrive) window.restoreBackupFromDrive(); });
 });
 </script>
