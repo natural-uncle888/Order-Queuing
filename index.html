@@ -195,6 +195,39 @@ mark {
   padding: 0 0.2em;
   border-radius: 2px;
 }
+
+/* === Mobile Enhancements === */
+@media (max-width: 768px) {
+  .wrap { padding: 12px; }
+  .toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .toolbar .right { margin-left: 0; width: 100%; display: flex; flex-direction: column; gap: 8px; }
+  .toolbar button, .toolbar .right button { width: 100%; min-height: 44px; font-size: 16px; }
+  .pill { width: 100%; }
+  .pill input, .pill select { width: 100% !important; }
+  .row { grid-template-columns: 1fr !important; }
+  .two-col { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 600px) {
+  /* Turn the big table into stacked cards */
+  table { border: 0; }
+  table thead { display: none; }
+  table tr { display: block; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 8px; box-shadow: var(--shadow); }
+  table td { display: block; border: none; padding: 8px; text-align: left; }
+  table td.right-align { text-align: left; }
+  table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  /* Make pills/buttons comfortable to tap */
+  button, .toolbar button { min-height: 44px; }
+  input, select, textarea { font-size: 16px; } /* avoid iOS zoom */
+}
+
 </style>
 <script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script></head>
 <body>
@@ -735,21 +768,21 @@ mark {
         const tr=document.createElement('tr');
         const dateCell = o.date ? o.date : '<span class="badge-soft">未排期</span>';
         tr.innerHTML=`
-          <td class="small muted">${idx+1}</td>
-          <td class="editable">${dateCell}</td>
-          <td class="editable">${o.time ? o.time : '<span class=\"badge-soft\">未排定</span>'}</td>
-          <td>${o.staff||''}</td>
-          <td>${o.customer||''}</td>
-          <td>${o.phone||''}</td>
-          <td>${(o.slots||[]).join('、')}</td>
-          <td>${o.address||''}</td>
-          <td></td>
-          <td class="toggle-confirm"></td>
-          <td class="toggle-quote"></td>
-          <td class="right-align">${fmtCurrency(o.total||0)}</td>
-          <td class="right-align">${fmtCurrency(o.netTotal||0)}</td>
-          <td>${o.contactMethod||''}</td>
-          <td class="op-cell"></td>`;
+          <td class="small muted" data-label="#">${idx+1}</td>
+          <td class="editable" data-label="日期">${dateCell}</td>
+          <td class="editable" data-label="時間">${o.time ? o.time : '<span class=\"badge-soft\">未排定</span>'}</td>
+          <td data-label="作業人員">${o.staff||''}</td>
+          <td data-label="客戶">${o.customer||''}</td>
+          <td data-label="電話">${o.phone||''}</td>
+          <td data-label="時段">${(o.slots||[]).join('、')}</td>
+          <td data-label="地址">${o.address||''}</td>
+          <td data-label="狀況"></td>
+          <td class="toggle-confirm" data-label="確認"></td>
+          <td class="toggle-quote" data-label="報價單"></td>
+          <td class="right-align" data-label="總金額">${fmtCurrency(o.total||0)}</td>
+          <td class="right-align" data-label="折後">${fmtCurrency(o.netTotal||0)}</td>
+          <td data-label="來源">${o.contactMethod||''}</td>
+          <td class="op-cell" data-label="操作"></td`;
         const st=o.status||'排定';
         const span=document.createElement('span');
         span.className='status ' + (st==='排定'?'P排定': st==='完成'?'C完成':'N未完成');
