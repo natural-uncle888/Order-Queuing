@@ -1624,52 +1624,6 @@ async function backupToDrive(token) {
     Swal.fire('❌ 備份錯誤', e.message, 'error');
   }
 }
-</script><script>
-async function restoreFromDrive(token) {
-  try {
-    // 搜尋兩個備份檔案
-    const query = "name contains '清洗訂單_備份_' and trashed=false";
-    const listRes = await fetch("https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(query) + "&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc", {
-      headers: new Headers({ Authorization: 'Bearer ' + token })
-    });
-    const listJson = await listRes.json();
-    const files = listJson.files || [];
-
-    if (files.length === 0) {
-      return Swal.fire('⚠️ 找不到任何備份檔', '', 'warning');
-    }
-
-    const inputOptions = {};
-    files.slice(0, 2).forEach(file => {
-      const time = new Date(file.modifiedTime).toLocaleString();
-      inputOptions[file.id] = `${file.name}（${time}）`;
-    });
-
-    const { value: fileId } = await Swal.fire({
-      title: '選擇要還原的備份檔',
-      input: 'radio',
-      inputOptions,
-      inputValidator: (value) => !value && '請選擇一個檔案',
-      confirmButtonText: '還原'
-    });
-
-    if (!fileId) return;
-
-    const downloadRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-      headers: new Headers({ Authorization: 'Bearer ' + token })
-    });
-    const data = await downloadRes.json();
-
-    localStorage.clear();
-    for (const [key, value] of Object.entries(data)) {
-      localStorage.setItem(key, value);
-    }
-
-    Swal.fire('✅ 還原成功', '', 'success').then(() => location.reload());
-  } catch (e) {
-    Swal.fire('❌ 還原錯誤', e.message, 'error');
-  }
-}
 </script></body>
 </html>
 <script>
