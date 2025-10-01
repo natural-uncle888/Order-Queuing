@@ -1541,144 +1541,43 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 <script src="https://apis.google.com/js/api.js"></script>
 <script>
-const CLIENT_ID = '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-let tokenClient, gapiInited = false, gisInited = false;
+let tokenClient;
 
-function gdriveInit() {
-  gapi.load('client', async () => {
-    await gapi.client.init({ apiKey: '', discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"] });
-    gapiInited = true;
-  });
-
+function initGoogle() {
   tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-callback: async (tokenResponse) => {
-  const token = tokenResponse.access_token;
-  setTimeout(() => {
-    Swal.fire({
-      title: '請選擇操作',
-      input: 'radio',
-      inputOptions: {
-        '1': '備份至 Google 雲端',
-        '2': '從 Google 雲端還原'
-      },
-      inputValidator: (value) => {
-        if (!value) return '請選擇一項操作';
-      },
-      confirmButtonText: '確定'
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        const choice = result.value;
-        if (choice === '1') await backupToDrive(token);
-        else if (choice === '2') await restoreFromDrive(token);
-      }
-    });
-  }, 0);
-},
-      uploadBackupToDrive();
-    }
-  });
-}
-
-function uploadBackupToDrive() {
-  const BACKUP_FILENAME = '清洗訂單_備份.json'; // 單一備份檔名（每次覆蓋）
-
-  const data = {
-    orders: JSON.parse(localStorage.getItem('yl_clean_orders_v1') || '[]'),
-    staffList: JSON.parse(localStorage.getItem('yl_clean_staff_v1') || '[]'),
-    contactList: JSON.parse(localStorage.getItem('yl_clean_contact_v1') || '[]'),
-    exportedAt: new Date().toISOString()
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-
-  const authHeader = new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token });
-
-  // 1) 先找是否已存在同名備份檔
-  const query = encodeURIComponent(`name = '${BACKUP_FILENAME}' and trashed = false`);
-  fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&spaces=drive&fields=files(id,name)`, {
-    method: 'GET',
-    headers: authHeader
-  })
-  .then(r => r.json())
-  .then(async listRes => {
-    const files = Array.isArray(listRes.files) ? listRes.files : [];
-
-    if (files.length > 0) {
-      // 2a) 有舊檔：用 PATCH + uploadType=media 直接覆蓋內容
-      const fileId = files[0].id;
-
-      const resp = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-        method: 'PATCH',
-        headers: new Headers({
-          'Authorization': 'Bearer ' + gapi.auth.getToken().access_token,
-          'Content-Type': 'application/json'
-        }),
-        body: blob
-      });
-
-      const json = await resp.json();
-      if (json && json.id) {
-        // 若有重複的同名檔案，清乾淨只保留第一個
-        if (files.length > 1) {
-          for (let i = 1; i < files.length; i++) {
-            try {
-              await fetch(`https://www.googleapis.com/drive/v3/files/${files[i].id}`, {
-                method: 'DELETE',
-                headers: authHeader
-              });
-            } catch (e) { /* 忽略刪除失敗，不影響覆蓋成功 */ }
+    client_id: '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com',
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: async (tokenResponse) => {
+      const token = tokenResponse.access_token;
+      setTimeout(() => {
+        Swal.fire({
+          title: '請選擇操作',
+          input: 'radio',
+          inputOptions: {
+            '1': '備份至 Google 雲端',
+            '2': '從 Google 雲端還原'
+          },
+          inputValidator: (value) => {
+            if (!value) return '請選擇一項操作';
+          },
+          confirmButtonText: '確定'
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            const choice = result.value;
+            if (choice === '1') await backupToDrive(token);
+            else if (choice === '2') await restoreFromDrive(token);
           }
-        }
-        alert('✅ 備份成功（已覆蓋舊檔）');
-      } else {
-        alert('❌ 覆蓋備份失敗：' + JSON.stringify(json));
-      }
-    } else {
-      // 2b) 沒有舊檔：建立一個固定檔名的備份檔
-      const metadata = {
-        name: BACKUP_FILENAME,
-        mimeType: 'application/json'
-      };
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', blob);
-
-      const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: authHeader,
-        body: form
-      });
-      const json = await resp.json();
-      if (json && json.id) {
-        alert('✅ 備份成功（已建立固定檔）');
-      } else {
-        alert('❌ 建立備份檔失敗：' + JSON.stringify(json));
-      }
+        });
+      }, 0);
     }
-  })
-  .catch(err => {
-    console.error(err);
-    alert('❌ 備份發生錯誤');
   });
 }
 
-document.getElementById('gdriveBackupBtn')?.addEventListener('click', () => {
-  if (!gapiInited) return alert('Google API 尚未初始化，請稍後再試');
+function initGoogleBackup() {
+  if (!tokenClient) initGoogle();
   tokenClient.requestAccessToken();
-});
-
-// 初始化
-window.onload = () => {
-  const script = document.createElement('script');
-  script.src = "https://accounts.google.com/gsi/client";
-  script.onload = () => {
-    gisInited = true;
-    gdriveInit();
-  };
-  document.body.appendChild(script);
-};</script></body>
+}
+</script></body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
@@ -1691,117 +1590,4 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 <!-- 加入 Google API SDK -->
 <script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
-<script>
-const GOOGLE_CLIENT_ID = '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com';
-const BACKUP_FILE_NAME = 'cleaner_backup.json';
 
-function initGoogleBackup() {
-  const tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: GOOGLE_CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/drive.file',
-callback: async (tokenResponse) => {
-  const token = tokenResponse.access_token;
-  setTimeout(() => {
-    Swal.fire({
-      title: '請選擇操作',
-      input: 'radio',
-      inputOptions: {
-        '1': '備份至 Google 雲端',
-        '2': '從 Google 雲端還原'
-      },
-      inputValidator: (value) => {
-        if (!value) return '請選擇一項操作';
-      },
-      confirmButtonText: '確定'
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        const choice = result.value;
-        if (choice === '1') await backupToDrive(token);
-        else if (choice === '2') await restoreFromDrive(token);
-      }
-    });
-  }, 0);
-},
-  inputValidator: (value) => {
-    if (!value) return '請選擇一項操作';
-  },
-  confirmButtonText: '確定'
-}).then(async (result) => {
-  if (result.isConfirmed) {
-    const choice = result.value;
-    if (choice === '1') {
-      await backupToDrive(token);
-    } else if (choice === '2') {
-      await restoreFromDrive(token);
-    }
-  }
-});
-
-      if (choice === '1') {
-        await backupToDrive(token);
-      } else if (choice === '2') {
-        await restoreFromDrive(token);
-      }
-}, 0);
-},
-  });
-  tokenClient.requestAccessToken();
-}
-
-async function backupToDrive(token) {
-  const data = { orders, staffList, contactList, expenses, expCats };
-  const metadata = { name: BACKUP_FILE_NAME, mimeType: 'application/json' };
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', new Blob([JSON.stringify(data)], { type: 'application/json' }));
-
-  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + token },
-    body: form,
-  });
-
-  if (res.ok) Swal.fire({ text: '✅ 備份完成！', icon: 'info' });
-  else Swal.fire({ text: '❌ 備份失敗', icon: 'info' });
-}
-
-async function restoreFromDrive(token) {
-  const listRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=name='${BACKUP_FILE_NAME}' and trashed=false`,
-    { headers: { Authorization: 'Bearer ' + token } }
-  );
-  const list = await listRes.json();
-  if (!list.files || list.files.length === 0) {
-    Swal.fire({ text: '找不到備份檔案', icon: 'info' });
-    return;
-  }
-
-  const fileId = list.files[0].id;
-  const dataRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-    { headers: { Authorization: 'Bearer ' + token } }
-  );
-  const data = await dataRes.json();
-
-  const confirmed = await Swal.fire({
-  title: '請確認',
-  text: '確認覆蓋本地資料並還原？',
-  icon: 'warning',
-  showCancelButton: true,
-  confirmButtonText: '確定',
-  cancelButtonText: '取消'
-});
-if (!confirmed.isConfirmed) return;
-
-  if (data.orders) { orders = data.orders; save(KEY, orders); }
-  if (data.staffList) { staffList = data.staffList; save(STAFF_KEY, staffList); initStaffSelects(); }
-  if (data.contactList) { contactList = data.contactList; save(CONTACT_KEY, contactList); initContactSelect(); }
-  if (data.expenses) { expenses = data.expenses; save(EXP_KEY, expenses); }
-  if (data.expCats) { expCats = data.expCats; save(EXP_CAT_KEY, expCats); }
-
-  refreshTable(); refreshExpense();
-  Swal.fire({ text: '✅ 還原完成！', icon: 'info' });
-}
-
-// 綁定 ☁️Google 按鈕
-$('gdriveBackupBtn')?.addEventListener('click', initGoogleBackup);</script>
