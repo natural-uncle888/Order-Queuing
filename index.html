@@ -202,7 +202,7 @@ mark {
 <div class="wrap toolbar">
 <div class="pill">
 <strong>月份</strong>
-<select id="yearSel"></select>
+<select id="yearSel"><option value="自然大叔"></option></select>
 <select id="monthSel"></select>
 </div>
 <div class="pill">
@@ -289,7 +289,7 @@ mark {
 <div class="col" style="grid-column:span 6">
 <label>作業人員</label>
 <div class="toolbar" style="gap:8px">
-<select id="staff"></select>
+<select id="staff"><option value="透天屋"></option><option value="大樓(有電梯)"></option><option value="大樓(無電梯)"></option><option value="其他(可自行輸入)"></option></select>
 <button class="inline-btn" id="addStaffBtn" type="button">新增人員</button>
 </div>
 </div>
@@ -1541,90 +1541,6 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 <script src="https://apis.google.com/js/api.js"></script>
 <script>
-async function backupToDrive(token) {
-  try {
-    const content = JSON.stringify(localStorage, null, 2);
-    const file = new Blob([content], { type: 'application/json' });
-
-    // 取得目前輪替索引（1或2）
-    let index = parseInt(localStorage.getItem('backupIndex') || '1');
-    const filename = `清洗訂單_備份_${index}.json`;
-
-    const metadata = {
-      name: filename,
-      mimeType: 'application/json'
-    };
-
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', file);
-
-    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-      method: 'POST',
-      headers: new Headers({ Authorization: 'Bearer ' + token }),
-      body: form
-    });
-
-    if (res.ok) {
-      Swal.fire('✅ 備份成功', filename, 'success');
-      const next = index === 1 ? 2 : 1;
-      localStorage.setItem('backupIndex', next.toString());
-    } else {
-      const err = await res.json();
-      Swal.fire('❌ 備份失敗', err.error.message, 'error');
-    }
-  } catch (e) {
-    Swal.fire('❌ 備份錯誤', e.message, 'error');
-  }
-}
-
-async function restoreFromDrive(token) {
-  try {
-    // 搜尋所有 1 和 2 的備份檔
-    const query = "name contains '清洗訂單_備份_' and trashed=false";
-    const listRes = await fetch("https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(query) + "&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc", {
-      headers: new Headers({ Authorization: 'Bearer ' + token })
-    });
-    const listJson = await listRes.json();
-    const files = listJson.files || [];
-
-    if (files.length === 0) {
-      return Swal.fire('⚠️ 找不到任何備份檔', '', 'warning');
-    }
-
-    // 建立選項：名稱＋時間
-    const inputOptions = {};
-    files.slice(0, 2).forEach(file => {
-      const time = new Date(file.modifiedTime).toLocaleString();
-      inputOptions[file.id] = `${file.name}（${time}）`;
-    });
-
-    const { value: fileId } = await Swal.fire({
-      title: '選擇要還原的備份檔',
-      input: 'radio',
-      inputOptions,
-      inputValidator: (value) => !value && '請選擇一個檔案',
-      confirmButtonText: '還原'
-    });
-
-    if (!fileId) return;
-
-    const downloadRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-      headers: new Headers({ Authorization: 'Bearer ' + token })
-    });
-    const data = await downloadRes.json();
-
-    localStorage.clear();
-    for (const [key, value] of Object.entries(data)) {
-      localStorage.setItem(key, value);
-    }
-
-    Swal.fire('✅ 還原成功', '', 'success').then(() => location.reload());
-  } catch (e) {
-    Swal.fire('❌ 還原錯誤', e.message, 'error');
-  }
-}
-</script><script>
 let tokenClient;
 
 function initGoogle() {
@@ -1660,6 +1576,53 @@ function initGoogle() {
 function initGoogleBackup() {
   if (!tokenClient) initGoogle();
   tokenClient.requestAccessToken();
+}
+</script><script>
+async function backupToDrive(token) {
+  try {
+    const content = JSON.stringify(localStorage, null, 2);
+    const file = new Blob([content], { type: 'application/json' });
+
+    // 使用 localStorage 控制輪替（1或2）
+    let index = parseInt(localStorage.getItem('backupIndex') || '1');
+    const filename = `清洗訂單_備份_${index}.json`;
+
+    // 查找同名舊檔案（如有則刪除）
+    const searchRes = await fetch("https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(`name='${filename}' and trashed=false`), {
+      headers: new Headers({ Authorization: 'Bearer ' + token })
+    });
+    const searchJson = await searchRes.json();
+    const existingFile = searchJson.files?.[0];
+    if (existingFile) {
+      await fetch("https://www.googleapis.com/drive/v3/files/" + existingFile.id, {
+        method: 'DELETE',
+        headers: new Headers({ Authorization: 'Bearer ' + token })
+      });
+    }
+
+    // 上傳新檔案（相同檔名）
+    const metadata = { name: filename, mimeType: 'application/json' };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', file);
+
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+      method: 'POST',
+      headers: new Headers({ Authorization: 'Bearer ' + token }),
+      body: form
+    });
+
+    if (res.ok) {
+      Swal.fire('✅ 備份成功', filename, 'success');
+      const next = index === 1 ? 2 : 1;
+      localStorage.setItem('backupIndex', next.toString());
+    } else {
+      const err = await res.json();
+      Swal.fire('❌ 備份失敗', err.error.message, 'error');
+    }
+  } catch (e) {
+    Swal.fire('❌ 備份錯誤', e.message, 'error');
+  }
 }
 </script></body>
 </html>
