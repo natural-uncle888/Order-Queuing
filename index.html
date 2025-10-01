@@ -139,7 +139,7 @@
 <input id="searchInput" placeholder="姓名 / 電話 / 地址" style="width:220px" type="text"/>
 </div>
 <div class="right"><button class="accent" id="gdriveBackupBtn">☁️Google</button>
-<button id="btnDriveRestore" class="btn-secondary" title="從 Google Drive 還原備份">↓Google</button>
+<button id="btnDriveRestore" class="btn-secondary" title="從 Google Drive 還原備份" onclick="window.handleDriveRestoreClick()">↓Google</button>
 <button class="accent" id="newBtn">新增訂單</button>
 <button id="newExpenseBtn">新增花費</button>
 <button id="exportJson">匯出JSON</button>
@@ -1518,7 +1518,50 @@ window.onload = () => {
   };
   document.body.appendChild(script);
 };
-</script></body>
+</script>
+<script>
+// 讓「↓Google」點擊時，一定在「使用者手勢」中觸發 GIS 視窗
+window.handleDriveRestoreClick = function() {
+  try {
+    // 如果已有 access token，直接還原
+    var tok = (window.gapi && gapi.auth && typeof gapi.auth.getToken==='function') ? gapi.auth.getToken() : null;
+    if (tok && tok.access_token) {
+      if (window.restoreBackupFromDrive) return window.restoreBackupFromDrive();
+    }
+
+    // 若尚未初始化，先建立 tokenClient
+    try {
+      if (!window.tokenClient && window.google && google.accounts && google.accounts.oauth2 && window.CLIENT_ID) {
+        window.tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: window.CLIENT_ID,
+          scope: (window.SCOPES || 'https://www.googleapis.com/auth/drive.file'),
+          callback: (resp) => {
+            if (resp && resp.access_token) {
+              try { if (window.gapi && gapi.auth && gapi.auth.setToken) gapi.auth.setToken({ access_token: resp.access_token }); } catch(e){}
+              if (window.restoreBackupFromDrive) window.restoreBackupFromDrive();
+            } else {
+              alert('授權失敗，請重試');
+            }
+          }
+        });
+      }
+    } catch(e) {}
+
+    if (!window.tokenClient) {
+      alert('Google 身分服務尚未就緒，請稍後重試（確認網路或關閉阻擋彈窗）。');
+      return;
+    }
+
+    // 在點擊的同步流程中直接要求 token，確保彈窗不被瀏覽器擋
+    window.tokenClient.requestAccessToken({ prompt: 'consent' });
+  } catch (e) {
+    console.error(e);
+    alert('無法啟動 Google 授權：' + (e && e.message ? e.message : e));
+  }
+};
+</script>
+
+</body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
@@ -1534,6 +1577,6 @@ window.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('DOMContentLoaded', () => {
   try { if (typeof gdriveInit === 'function') gdriveInit(); } catch(e){}
   const btn = document.getElementById('btnDriveRestore');
-  if (btn) btn.addEventListener('click', ()=>{ if (window.restoreBackupFromDrive) window.restoreBackupFromDrive(); });
+  if (btn) btn.addEventListener('click', window.handleDriveRestoreClick);
 });
 </script>
