@@ -1683,11 +1683,8 @@ function initGoogleBackup() {
     client_id: GOOGLE_CLIENT_ID,
     scope: 'https://www.googleapis.com/auth/drive.file',
     callback: async (tokenResponse) => {
-
       const token = tokenResponse.access_token;
-      
-setTimeout(() => {
-  \
+      \
 Swal.fire({
   title: '請選擇操作',
   input: 'radio',
@@ -1715,8 +1712,7 @@ Swal.fire({
       } else if (choice === '2') {
         await restoreFromDrive(token);
       }
-}, 0);
-},
+    },
   });
   tokenClient.requestAccessToken();
 }
