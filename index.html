@@ -138,7 +138,7 @@
 <strong>搜尋</strong>
 <input id="searchInput" placeholder="姓名 / 電話 / 地址" style="width:220px" type="text"/>
 </div>
-<div class="right"><button class="accent" id="gdriveBackupBtn"☁️Google</button>
+<div class="right"><button class="accent" id="gdriveBackupBtn">☁️Google</button>
 <button class="accent" id="newBtn">新增訂單</button>
 <button id="newExpenseBtn">新增花費</button>
 <button id="exportJson">匯出JSON</button>
@@ -1576,176 +1576,79 @@ window.addEventListener('DOMContentLoaded', () => {
   if (order) order.open = false;
   if (exp) exp.open = false;
 });
+</script>
+
+<!-- 加入 Google API SDK -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <script>
-// === Enhancement: Single "☁️Google" button -> pick Backup or Restore ===
-(function(){
-  const BACKUP_FILENAME = '清洗訂單_備份.json';
+const GOOGLE_CLIENT_ID = '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com';
+const BACKUP_FILE_NAME = 'cleaner_backup.json';
 
-  function authHeader() {
-    const tok = (window.gapi && gapi.auth && gapi.auth.getToken && gapi.auth.getToken()) || null;
-    const access = tok && tok.access_token;
-    if (!access) throw new Error('尚未登入 Google');
-    return new Headers({ 'Authorization': 'Bearer ' + access });
-  }
-
-  function ensureToken() {
-    return new Promise((resolve, reject) => {
-      try{
-        const tok = gapi?.auth?.getToken?.();
-        if (tok && tok.access_token) return resolve(tok.access_token);
-      }catch{}
-      if (!window.tokenClient) return reject(new Error('Google API 尚未初始化，請稍後再試'));
-      tokenClient.requestAccessToken({
-        prompt: '',
-        callback: (resp)=>{
-          if (resp && resp.access_token) resolve(resp.access_token);
-          else reject(new Error('無法取得存取權杖'));
-        }
-      });
-    });
-  }
-
-  async function findBackupFile() {
-    const q = encodeURIComponent(`name='${BACKUP_FILENAME}' and trashed=false`);
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
-      method: 'GET', headers: authHeader()
-    });
-    if (!res.ok) throw new Error('查詢備份檔失敗');
-    const j = await res.json();
-    return Array.isArray(j.files) && j.files[0] ? j.files[0] : null;
-  }
-
-  async function restoreFromDrive() {
-    const file = await findBackupFile();
-    if (!file) { alert('找不到雲端備份檔，請先執行一次備份。'); return; }
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
-      method: 'GET', headers: authHeader()
-    });
-    if (!res.ok) { alert('下載備份檔失敗'); return; }
-    let cloud;
-    try { cloud = await res.json(); } catch { alert('雲端備份不是有效 JSON'); return; }
-
-    const strategy = await mergeStrategyPrompt(); // 'replace'|'merge'|'cancel'
-    if (strategy === 'cancel') return;
-
-    const read = (k, fallback='[]') => JSON.parse(localStorage.getItem(k) || fallback);
-    const write= (k, v) => localStorage.setItem(k, JSON.stringify(v));
-
-    // keys used in this app's backup payload
-    const keys = [
-      ['yl_clean_orders_v1', 'orders'],
-      ['yl_clean_staff_v1', 'staffList'],
-      ['yl_clean_contact_v1', 'contactList']
-    ];
-
-    if (strategy === 'replace') {
-      for (const [localKey, cloudKey] of keys) {
-        write(localKey, cloud[cloudKey] ?? []);
+function initGoogleBackup() {
+  const tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: async (tokenResponse) => {
+      const token = tokenResponse.access_token;
+      const choice = prompt('請選擇操作：\n1 = 備份至 Google 雲端\n2 = 從 Google 雲端還原');
+      if (choice === '1') {
+        await backupToDrive(token);
+      } else if (choice === '2') {
+        await restoreFromDrive(token);
       }
-    } else {
-      // merge
-      const mergeById = (a=[], b=[]) => {
-        const map = new Map();
-        for (const item of a) {
-          const id = (item && item.id != null) ? item.id : JSON.stringify(item);
-          map.set(id, item);
-        }
-        for (const item of b) {
-          const id = (item && item.id != null) ? item.id : JSON.stringify(item);
-          map.set(id, { ...(map.get(id) || {}), ...item });
-        }
-        return Array.from(map.values());
-      };
-      // orders by id; staff/contact simple unique by stringified
-      const localOrders = read('yl_clean_orders_v1');
-      const cloudOrders = cloud.orders || [];
-      write('yl_clean_orders_v1', mergeById(localOrders, cloudOrders));
-
-      const uniq = (arr)=> Array.from(new Set(arr.map(x=> JSON.stringify(x)))).map(s=>JSON.parse(s));
-      write('yl_clean_staff_v1', uniq([...(read('yl_clean_staff_v1')||[]), ...((cloud.staffList)||[])]));
-      write('yl_clean_contact_v1', mergeById(read('yl_clean_contact_v1'), cloud.contactList||[]));
-    }
-
-    alert('✅ 還原完成（' + (strategy==='replace'?'取代':'合併') + '）。為確保畫面一致，建議重新整理頁面。');
-  }
-
-  function pickActionDialog() {
-    return new Promise((resolve)=>{
-      const html = `
-        <div id="gdlg" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35);z-index:9999">
-          <div style="background:#fff;border-radius:14px;padding:18px;min-width:280px;max-width:90vw;box-shadow:0 6px 24px rgba(0,0,0,.2)">
-            <div style="font-size:16px;font-weight:600;margin-bottom:10px">選擇動作</div>
-            <p style="margin:0 0 12px 0">已登入 Google。要進行哪個雲端動作？</p>
-            <div style="display:flex;gap:8px;justify-content:flex-end">
-              <button id="gdlg-cancel"  style="padding:8px 12px;border-radius:10px;border:1px solid #ddd;background:#f5f5f5">取消</button>
-              <button id="gdlg-restore" style="padding:8px 12px;border-radius:10px;border:1px solid #ddd;background:#fff">從雲端還原</button>
-              <button id="gdlg-backup"  style="padding:8px 12px;border-radius:10px;border:none;background:#2563eb;color:#fff">備份到雲端</button>
-            </div>
-          </div>
-        </div>`;
-      const wrap = document.createElement('div');
-      wrap.innerHTML = html;
-      document.body.appendChild(wrap);
-      wrap.querySelector('#gdlg-cancel').onclick  = ()=> { wrap.remove(); resolve('cancel'); };
-      wrap.querySelector('#gdlg-restore').onclick = ()=> { wrap.remove(); resolve('restore'); };
-      wrap.querySelector('#gdlg-backup').onclick  = ()=> { wrap.remove(); resolve('backup');  };
-    });
-  }
-
-  function mergeStrategyPrompt() {
-    return new Promise((resolve)=>{
-      const html = `
-        <div id="gdlg2" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35);z-index:9999">
-          <div style="background:#fff;border-radius:14px;padding:18px;min-width:280px;max-width:90vw;box-shadow:0 6px 24px rgba(0,0,0,.2)">
-            <div style="font-size:16px;font-weight:600;margin-bottom:10px">還原方式</div>
-            <ul style="margin:0 0 12px 18px;padding:0">
-              <li><b>取代</b>：用雲端覆蓋本機。</li>
-              <li><b>合併</b>：以 id 合併訂單，名單類去重。</li>
-            </ul>
-            <div style="display:flex;gap:8px;justify-content:flex-end">
-              <button id="gdlg2-cancel"  style="padding:8px 12px;border-radius:10px;border:1px solid #ddd;background:#f5f5f5">取消</button>
-              <button id="gdlg2-merge"   style="padding:8px 12px;border-radius:10px;border:1px solid #ddd;background:#fff">合併</button>
-              <button id="gdlg2-replace" style="padding:8px 12px;border-radius:10px;border:none;background:#ef4444;color:#fff">取代</button>
-            </div>
-          </div>
-        </div>`;
-      const wrap = document.createElement('div');
-      wrap.innerHTML = html;
-      document.body.appendChild(wrap);
-      wrap.querySelector('#gdlg2-cancel').onclick  = ()=> { wrap.remove(); resolve('cancel'); };
-      wrap.querySelector('#gdlg2-merge').onclick   = ()=> { wrap.remove(); resolve('merge'); };
-      wrap.querySelector('#gdlg2-replace').onclick = ()=> { wrap.remove(); resolve('replace'); };
-    });
-  }
-
-  // Rebind the ☁️Google button: clone to remove old listeners, then attach new flow
-  window.addEventListener('DOMContentLoaded', () => {
-    const btn = document.getElementById('gdriveBackupBtn');
-    if (!btn) return;
-    const clone = btn.cloneNode(true);
-    btn.parentNode.replaceChild(clone, btn);
-    clone.addEventListener('click', async () => {
-      try {
-        clone.disabled = true;
-        clone.textContent = 'Google…';
-        await ensureToken();
-        const action = await pickActionDialog();
-        if (action === 'backup') {
-          if (typeof window.uploadBackupToDrive === 'function') await window.uploadBackupToDrive();
-          else alert('找不到備份函式');
-        } else if (action === 'restore') {
-          await restoreFromDrive();
-        }
-      } catch (e) {
-        console.error(e);
-        alert('Google 動作失敗：' + (e.message || e));
-      } finally {
-        clone.disabled = false;
-        clone.textContent = '☁️Google';
-      }
-    });
+    },
   });
-})();
-</script>
+  tokenClient.requestAccessToken();
+}
+
+async function backupToDrive(token) {
+  const data = { orders, staffList, contactList, expenses, expCats };
+  const metadata = { name: BACKUP_FILE_NAME, mimeType: 'application/json' };
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  form.append('file', new Blob([JSON.stringify(data)], { type: 'application/json' }));
+
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token },
+    body: form,
+  });
+
+  if (res.ok) alert('✅ 備份完成！');
+  else alert('❌ 備份失敗');
+}
+
+async function restoreFromDrive(token) {
+  const listRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=name='${BACKUP_FILE_NAME}' and trashed=false`,
+    { headers: { Authorization: 'Bearer ' + token } }
+  );
+  const list = await listRes.json();
+  if (!list.files || list.files.length === 0) {
+    alert('找不到備份檔案');
+    return;
+  }
+
+  const fileId = list.files[0].id;
+  const dataRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    { headers: { Authorization: 'Bearer ' + token } }
+  );
+  const data = await dataRes.json();
+
+  if (!confirm('確認覆蓋本地資料並還原？')) return;
+
+  if (data.orders) { orders = data.orders; save(KEY, orders); }
+  if (data.staffList) { staffList = data.staffList; save(STAFF_KEY, staffList); initStaffSelects(); }
+  if (data.contactList) { contactList = data.contactList; save(CONTACT_KEY, contactList); initContactSelect(); }
+  if (data.expenses) { expenses = data.expenses; save(EXP_KEY, expenses); }
+  if (data.expCats) { expCats = data.expCats; save(EXP_CAT_KEY, expCats); }
+
+  refreshTable(); refreshExpense();
+  alert('✅ 還原完成！');
+}
+
+// 綁定 ☁️Google 按鈕
+$('gdriveBackupBtn')?.addEventListener('click', initGoogleBackup);
 </script>
