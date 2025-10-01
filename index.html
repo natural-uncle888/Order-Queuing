@@ -7,20 +7,24 @@
 <title>自然大叔 ∣ 訂單排程系統</title>
 <link href="https://res.cloudinary.com/dijzndzw2/image/upload/v1757176751/logo-3_hddq08.png" rel="icon" type="image/png"/>
 <style>
-    :root{
-      --bg:#f7f7fb;
-      --card:#ffffff;
-      --muted:#6b7280;
-      --text:#111827;
-      --primary:#2563eb;
-      --primary-weak:#dbeafe;
-      --accent:#10b981;
-      --warn:#f59e0b;
-      --danger:#ef4444;
-      --border:#e5e7eb;
-      --radius:16px;
-      --shadow:0 10px 25px rgba(0,0,0,.08);
-    }
+    
+
+:root {
+  --bg: #e0e7ef;
+  --card: #ffffff;
+  --muted: #374151;
+  --text: #111827;
+  --primary: #2563eb;
+  --primary-weak: #bfdbfe;
+  --accent: #059669;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --border: #94a3b8;
+  --radius: 16px;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+}
+
+
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
@@ -99,8 +103,100 @@
     details.accordion > summary{list-style:none;cursor:pointer;padding:14px 16px;border-radius:var(--radius);font-weight:600}
     details.accordion[open] > summary{border-bottom:1px solid var(--border)}
     details.accordion .content{padding:16px}
-  </style>
-</head>
+  
+/* 增強按鈕視覺 */
+button, .toolbar button {
+  transition: background 0.2s ease, color 0.2s ease;
+}
+button:hover, .toolbar button:hover {
+  filter: brightness(1.1);
+}
+
+/* 主要按鈕強化 */
+.toolbar .primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.toolbar .primary:hover {
+  background: #1e40af;
+}
+
+/* 強調按鈕（如 Google/新增） */
+.toolbar .accent {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.toolbar .accent:hover {
+  background: #047857;
+}
+
+/* 危險按鈕 hover 強化 */
+.toolbar .danger:hover {
+  background: #b91c1c;
+}
+
+/* 清晰的狀態圓角標籤 */
+.status {
+  font-weight: bold;
+  border-width: 2px;
+}
+
+/* 表格行 hover 高亮 */
+tbody tr:hover {
+  background: #f0f9ff;
+}
+
+/* 搜尋高亮 mark 顏色加深 */
+mark {
+  background: #facc15;
+  color: #000;
+}
+
+/* 強化輸入欄位與卡片對比 */
+input[type="text"],
+input[type="date"],
+input[type="time"],
+input[type="number"],
+select,
+textarea {
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+/* hover 狀態加強 */
+button:hover,
+.toolbar button:hover {
+  filter: brightness(1.12);
+}
+
+/* 表格 hover 更明顯 */
+tbody tr:hover {
+  background: #dbeafe;
+}
+
+/* 強化表格標頭對比 */
+thead th {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+/* 搜尋 mark 強化 */
+mark {
+  background: #facc15;
+  padding: 0 0.2em;
+  border-radius: 2px;
+}
+</style>
+<script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script></head>
 <body>
 <header>
 <div class="wrap toolbar">
@@ -1444,7 +1540,6 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 <script src="https://apis.google.com/js/api.js"></script>
-
 <script>
 const CLIENT_ID = '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
@@ -1577,11 +1672,32 @@ window.addEventListener('DOMContentLoaded', () => {
   if (exp) exp.open = false;
 });
 </script>
-
 <!-- 加入 Google API SDK -->
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-
+<script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
 <script>
+function updateLastBackupTime() {
+  const now = new Date();
+  const str = now.getFullYear() + '/' +
+              String(now.getMonth() + 1).padStart(2, '0') + '/' +
+              String(now.getDate()).padStart(2, '0') + ' ' +
+              String(now.getHours()).padStart(2, '0') + ':' +
+              String(now.getMinutes()).padStart(2, '0');
+  const el = document.getElementById('lastBackupTime');
+  if (el) el.textContent = '最後備份：' + str;
+}
+
+
+
+let gapiToken = null; // 全域 token 儲存
+
+setInterval(() => {
+  if (gapiToken) {
+    backupToDrive(gapiToken, true); // 每 15 分鐘自動備份（靜默）
+    console.log('⏱️ 已自動備份至 Google Drive');
+  }
+}, 1000 * 60 * 15); // 每 15 分鐘執行一次
+
+
 const GOOGLE_CLIENT_ID = '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com';
 const BACKUP_FILE_NAME = 'cleaner_backup.json';
 
@@ -1591,7 +1707,29 @@ function initGoogleBackup() {
     scope: 'https://www.googleapis.com/auth/drive.file',
     callback: async (tokenResponse) => {
       const token = tokenResponse.access_token;
-      const choice = prompt('請選擇操作：\n1 = 備份至 Google 雲端\n2 = 從 Google 雲端還原');
+      \
+Swal.fire({
+  title: '請選擇操作',
+  input: 'radio',
+  inputOptions: {
+    '1': '備份至 Google 雲端',
+    '2': '從 Google 雲端還原'
+  },
+  inputValidator: (value) => {
+    if (!value) return '請選擇一項操作';
+  },
+  confirmButtonText: '確定'
+}).then(async (result) => {
+  if (result.isConfirmed) {
+    const choice = result.value;
+    if (choice === '1') {
+      await backupToDrive(token);
+    } else if (choice === '2') {
+      await restoreFromDrive(token);
+    }
+  }
+});
+
       if (choice === '1') {
         await backupToDrive(token);
       } else if (choice === '2') {
@@ -1602,7 +1740,7 @@ function initGoogleBackup() {
   tokenClient.requestAccessToken();
 }
 
-async function backupToDrive(token) {
+async function backupToDrive(token, silent = false) {
   const data = { orders, staffList, contactList, expenses, expCats };
   const metadata = { name: BACKUP_FILE_NAME, mimeType: 'application/json' };
   const form = new FormData();
@@ -1615,8 +1753,8 @@ async function backupToDrive(token) {
     body: form,
   });
 
-  if (res.ok) alert('✅ 備份完成！');
-  else alert('❌ 備份失敗');
+  if (res.ok) { if (!silent) Swal.fire({ text: '✅ 備份完成！', icon: 'success' }); updateLastBackupTime(); } else if (!silent) Swal.fire({ text: '✅ 備份完成！', icon: 'success' });
+  else Swal.fire({ text: '❌ 備份失敗', icon: 'info' });
 }
 
 async function restoreFromDrive(token) {
@@ -1626,7 +1764,7 @@ async function restoreFromDrive(token) {
   );
   const list = await listRes.json();
   if (!list.files || list.files.length === 0) {
-    alert('找不到備份檔案');
+    Swal.fire({ text: '找不到備份檔案', icon: 'info' });
     return;
   }
 
@@ -1637,7 +1775,15 @@ async function restoreFromDrive(token) {
   );
   const data = await dataRes.json();
 
-  if (!confirm('確認覆蓋本地資料並還原？')) return;
+  const confirmed = await Swal.fire({
+  title: '請確認',
+  text: '確認覆蓋本地資料並還原？',
+  icon: 'warning',
+  showCancelButton: true,
+  confirmButtonText: '確定',
+  cancelButtonText: '取消'
+});
+if (!confirmed.isConfirmed) return;
 
   if (data.orders) { orders = data.orders; save(KEY, orders); }
   if (data.staffList) { staffList = data.staffList; save(STAFF_KEY, staffList); initStaffSelects(); }
@@ -1646,7 +1792,7 @@ async function restoreFromDrive(token) {
   if (data.expCats) { expCats = data.expCats; save(EXP_CAT_KEY, expCats); }
 
   refreshTable(); refreshExpense();
-  alert('✅ 還原完成！');
+  Swal.fire({ text: '✅ 還原完成！', icon: 'info' });
 }
 
 // 綁定 ☁️Google 按鈕
