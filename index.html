@@ -100,10 +100,7 @@
     details.accordion[open] > summary{border-bottom:1px solid var(--border)}
     details.accordion .content{padding:16px}
   </style>
-<style>
-/* --- injected: hide legacy restore button --- */
-#btnDriveRestore { display: none !important; }
-</style>
+<style>#btnDriveRestore{display:none!important;}</style>
 </head>
 <body>
 <header>
@@ -1469,7 +1466,7 @@ function gdriveInit() {
         alert('授權失敗');
         return;
       }
-      uploadBackupToDrive();
+      // (single-entry) token acquired; action chosen later
     }
   });
 }
@@ -1643,10 +1640,9 @@ window.addEventListener('DOMContentLoaded', ()=>{
 });
 </script>
 
-<!-- injected: Single-entry Google Backup/Restore chooser -->
+<!-- injected: Single-entry chooser (fixed) -->
 <script>
 (function () {
-  // Helpers
   async function showDriveActionChooser() {
     const choice = prompt(
       '要執行哪個動作？\n\n1 = 備份（上傳到 Google Drive）\n2 = 還原（從 Google Drive 覆蓋本機）\n\n按「取消」放棄。',
@@ -1678,9 +1674,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
       if (!res.ok) return false;
       const json = await res.json();
       return Array.isArray(json.files) && json.files.length > 0;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { return false; }
   }
 
   async function doRestoreFromDrive() {
@@ -1725,22 +1719,21 @@ window.addEventListener('DOMContentLoaded', ()=>{
   }
 
   function wireSingleEntry() {
-    // Hide legacy restore button if present
     var restoreBtn = document.getElementById('btnDriveRestore');
     if (restoreBtn) restoreBtn.style.display = 'none';
 
     var mainBtn = document.getElementById('gdriveBackupBtn');
     if (!mainBtn) return;
 
-    // Rebind click handler to: request token, then chooser
     mainBtn.addEventListener('click', function(ev) {
       ev.preventDefault();
+
       if (!window.tokenClient) {
         alert('Google API 尚未初始化，請稍後再試');
         return;
       }
 
-      // Set our callback for this request cycle
+      // Overwrite callback just for this request
       window.tokenClient.callback = async function(tokenResponse) {
         if (tokenResponse && tokenResponse.error) {
           alert('授權失敗，請重試。');
@@ -1779,12 +1772,10 @@ window.addEventListener('DOMContentLoaded', ()=>{
       } catch (e) {
         alert('授權流程啟動失敗，請重試。');
       }
-    }, { capture: true }); // capture 避免舊的 handler 先跑
+    }, { capture: true });
   }
 
-  // Attempt to wire after DOM ready; if tokenClient not ready yet, retry a few times
   document.addEventListener('DOMContentLoaded', function() {
-    // Inject style to hide restore button (in case CSS isn't present yet)
     try {
       var style = document.createElement('style');
       style.textContent = "#btnDriveRestore{display:none !important;}";
@@ -1798,10 +1789,8 @@ window.addEventListener('DOMContentLoaded', ()=>{
         clearInterval(timer);
         wireSingleEntry();
       }
-      if (tries > 40) { // ~4s
+      if (tries > 40) {
         clearInterval(timer);
-        // Try wiring the button anyway (maybe tokenClient will be set later,
-        // but click will show "尚未初始化")
         wireSingleEntry();
       }
     }, 100);
