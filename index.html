@@ -1681,7 +1681,7 @@ async function restoreFromDrive(token) {
 <script>
 // ===== Google Calendar Direct Upload (checkbox-selected orders) =====
 // !!! 將下方兩個常數換成你自己的憑證（Google Cloud Console 建立 OAuth Web 用戶端並啟用 Calendar API）
-const GAPI_CLIENT_ID = "894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com"; // 必填
+const GAPI_CLIENT_ID = "YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com"; // 必填
 const GAPI_API_KEY   = "YOUR_API_KEY"; // 建議填
 const GAPI_DISCOVERY = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
 const GAPI_SCOPES    = "https://www.googleapis.com/auth/calendar.events";
@@ -1840,6 +1840,115 @@ window.addEventListener('DOMContentLoaded', ()=>{
 });
 </script>
 <!-- END: GCal Direct Upload Patch -->
+
+<script>
+// ===== Robust row→order matching (handles filtering/sorting/pagination) =====
+(function(){
+  // Build a quick index of header name -> column index
+  function getHeaderIndexMap(){
+    const map = {};
+    const ths = document.querySelectorAll('table thead th');
+    ths.forEach((th, i)=>{
+      const name = (th.textContent||'').trim();
+      if(name) map[name] = i;
+    });
+    return map;
+  }
+
+  function cellText(tr, idx){
+    if(!tr || idx==null) return '';
+    const td = tr.querySelectorAll('td')[idx] || null;
+    return (td ? td.textContent : '').trim();
+  }
+
+  function normalizePhone(s){
+    return (s||'').replace(/\D+/g,''); // keep digits
+  }
+
+  function pickBestMatch(cands, sig){
+    if(cands.length<=1) return cands[0]||null;
+    // Try strict match all fields
+    let m = cands.find(o => (o.date||'')===sig.date && (o.time||'')===sig.time &&
+                            (o.customer||'')===sig.customer && normalizePhone(o.phone)===sig.phone);
+    if(m) return m;
+    // Try date+time+phone
+    m = cands.find(o => (o.date||'')===sig.date && (o.time||'')===sig.time &&
+                        normalizePhone(o.phone)===sig.phone);
+    if(m) return m;
+    // Try date+time+customer
+    m = cands.find(o => (o.date||'')===sig.date && (o.time||'')===sig.time &&
+                        (o.customer||'')===sig.customer);
+    if(m) return m;
+    // Fallback first
+    return cands[0]||null;
+  }
+
+  function deriveOrderFromRow(tr){
+    const headers = getHeaderIndexMap();
+    // adjust for leading checkbox column: our header has no text there, so indices line up naturally
+    const sig = {
+      date: cellText(tr, headers['日期']),
+      time: cellText(tr, headers['時間']),
+      customer: cellText(tr, headers['客戶']),
+      phone: normalizePhone(cellText(tr, headers['電話'])),
+      address: cellText(tr, headers['地址'])
+    };
+    // Filter candidates by date/time first to reduce search space
+    const src = (window.orders||[]);
+    let cands = src.filter(o => (o.date||'')===sig.date && (o.time||'')===sig.time);
+    if(cands.length===0){
+      // maybe time not set in data but present in UI badge? ignore in that case
+      cands = src.filter(o => (o.date||'')===sig.date);
+    }
+    const found = pickBestMatch(cands, sig);
+    return found || null;
+  }
+
+  // Enhance existing backfill: assign accurate data-id by row content
+  function fixRowCheckboxBinding(){
+    document.querySelectorAll('table tbody tr').forEach(tr=>{
+      const cb = tr.querySelector('input.rowSel');
+      if(!cb) return;
+      const haveId = cb.getAttribute('data-id');
+      if(haveId) return;
+      const order = deriveOrderFromRow(tr);
+      if(order && (order.id!=null)){
+        cb.setAttribute('data-id', String(order.id));
+      }
+    });
+  }
+
+  // Replace getSelectedOrders to read from row if id missing
+  const originalGetSelectedOrders = window.getSelectedOrders;
+  window.getSelectedOrders = function(){
+    // ensure row linking done
+    fixRowCheckboxBinding();
+    const ids = Array.from(document.querySelectorAll('input.rowSel:checked'))
+      .map(el => el.getAttribute('data-id'))
+      .filter(Boolean);
+    if(ids.length){
+      const set = new Set(ids.map(String));
+      return (window.orders||[]).filter(o => set.has(String(o.id)));
+    }
+    // If still no ids, build orders directly from rows
+    const picked = [];
+    document.querySelectorAll('input.rowSel:checked').forEach(cb=>{
+      const tr = cb.closest('tr');
+      const order = deriveOrderFromRow(tr);
+      if(order) picked.push(order);
+    });
+    return picked;
+  };
+
+  // Run after table renders
+  window.addEventListener('DOMContentLoaded', ()=>{
+    setTimeout(fixRowCheckboxBinding, 200);
+  });
+  // Expose for manual call after refreshTable()
+  window.fixRowCheckboxBinding = fixRowCheckboxBinding;
+})();
+</script>
+
 </body>
 </html>
 <script>
