@@ -243,36 +243,69 @@ th.col-total, td.col-total {
 
 
 @media (max-width: 768px) {
-  /* 只針對顯示未排期的 pill 做橫向貼齊修正 */
+  .toolbar {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
+    width: 100%;
+  }
+  .toolbar > * {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+  .toolbar .pill,
   .toolbar label.pill {
     display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
     justify-content: flex-start !important;
-    font-size: 13px !important;
-    gap: 8px !important;
-    width: 100% !important;
-    min-width: 0;
-    margin: 0;
-    padding: 0 14px !important;
     height: 44px;
-    box-sizing: border-box;
+    padding: 0 16px !important;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 15px;
+    gap: 0;
+    margin: 0;
+    width: 100% !important;
   }
   .toolbar label.pill input[type="checkbox"] {
     margin-right: 8px;
-    margin-left: 0;
     width: 22px;
     height: 22px;
     accent-color: #2563eb;
     flex-shrink: 0;
   }
   .toolbar label.pill span {
-    flex: 1 1 auto;
-    font-size: 14px !important;
-    letter-spacing: 0.01em;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
     white-space: nowrap;
-    padding-left: 2px;
+    text-overflow: ellipsis;
+    font-size: 15px;
+    line-height: 1;
+    padding: 0;
+    margin: 0;
     display: block;
+  }
+  /* 所有按鈕都維持同寬同高 */
+  .toolbar .right {
+    display: contents !important;
+    width: 100%;
+    margin-left: 0;
+    gap: 0 !important;
+  }
+  .toolbar .right button {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 44px;
+    font-size: 15px;
+    margin: 0 !important;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 </style>
