@@ -242,28 +242,63 @@ th.col-total, td.col-total {
 }
 
 
-/* --- 手機工具列 2欄式 --- */
+/* === Mobile toolbar enhancements (2 columns + special checkbox style) === */
 @media (max-width: 768px) {
   .toolbar {
     display: grid !important;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 10px 12px;
     align-items: stretch;
+    width: 100%;
   }
-  .toolbar .pill, .toolbar label.pill {
+  .toolbar .pill,
+  .toolbar label.pill {
     width: 100%;
     min-width: 0;
     margin: 0;
   }
+  /* Special style for "顯示未排期" checkbox */
+  .toolbar label.pill {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    font-size: 13px !important;
+    gap: 8px !important;
+    padding: 6px 10px !important;
+    height: 38px;
+  }
+  .toolbar label.pill input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #2563eb;
+    margin-right: 4px;
+    flex-shrink: 0;
+  }
+  .toolbar label.pill span {
+    font-size: 13px !important;
+    line-height: 1.3;
+    letter-spacing: 0.01em;
+    padding-top: 1px;
+  }
+  /* 工具按鈕區: 2欄式 */
   .toolbar .right {
     grid-column: span 2;
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 8px;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
     width: 100%;
     margin-left: 0;
-    justify-content: flex-end;
+    justify-content: stretch;
+    flex-direction: unset;
+  }
+  .toolbar .right button {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 44px;
+    font-size: 15px;
+    margin: 0 !important;
+    box-sizing: border-box;
   }
 }
 </style>
