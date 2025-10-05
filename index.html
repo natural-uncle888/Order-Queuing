@@ -1790,18 +1790,9 @@ async function uploadEventToCalendar(o) {
   const duration = +o.durationMinutes || 120;
   const end = new Date(start.getTime() + duration * 60 * 1000);
   const event = {
-    summary: `${o.city || ''}${o.district ? '-' + o.district : ''}-${o.customer || ''}`,
+    summary: `${o.customer || '客戶'} 清洗安排`,
     location: o.address || '',
     description: [
-      `聯絡人：${o.customer || ''}`,
-      `電話：${o.phone || ''}`,
-      `金額：${o.netTotal || o.total || 0}`,
-      `地址：${o.address || ''}`,
-      o.items ? `清洗項目：${o.items}` : '',
-      o.acFloor ? `冷氣樓層：${o.acFloor}` : '',
-      o.wmFloor ? `洗衣機樓層：${o.wmFloor}` : '',
-      o.note ? `備註：${o.note}` : ''
-    ].filter(Boolean).join('\n'),
       `作業人員：${o.staff || ''}`,
       `電話：${o.phone || ''}`,
       `金額：${o.netTotal || o.total || 0}`,
