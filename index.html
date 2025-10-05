@@ -241,6 +241,31 @@ th.col-total, td.col-total {
   table td.keep-mobile { display: block !important; }
 }
 
+
+/* --- 手機工具列 2欄式 --- */
+@media (max-width: 768px) {
+  .toolbar {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .toolbar .pill, .toolbar label.pill {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+  .toolbar .right {
+    grid-column: span 2;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+}
 </style>
 <script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script></head>
 <body>
@@ -558,7 +583,7 @@ th.col-total, td.col-total {
 <div class="col" style="grid-column:span 4">
 <label>日期</label>
 <input id="expDate" type="date"/>
-</div><div class="col" style="grid-column:span 3"><label>工作時長（分鐘）</label><input id="expDurationMinutes" min="15" step="15" type="number" value="120"/></div>
+</div><div class="col" style="grid-column:span 3"><label>工作時長（分鐘）</label><input id="durationMinutes" min="15" step="15" type="number" value="120"/></div>
 <div class="col" style="grid-column:span 4">
 <label>類別</label>
 <div class="toolbar" style="gap:8px">
@@ -704,6 +729,7 @@ th.col-total, td.col-total {
     function gatherForm(){
       return {
     durationMinutes: +$('durationMinutes').value || 120,
+    durationMinutes: +$('durationMinutes').value || 120,
         id: $('id').value || crypto.randomUUID(),
         staff:$('staff').value, date:$('date').value, time:$('time').value,
         confirmed:$('confirmed')?.checked||false, quotationOk:$('quotationOk')?.checked||false,
@@ -724,7 +750,6 @@ th.col-total, td.col-total {
       $('orderAccordion').open = true; $('orderAccordion').scrollIntoView({behavior:'smooth', block:'start'});
       $('id').value=o.id||''; $('staff').value=o.staff||staffList[0];
       $('date').value=o.date||''; $('time').value=o.time||'';
-      $('durationMinutes').value = o.durationMinutes || 120;
       $('confirmed').checked=!!o.confirmed; $('quotationOk').checked=!!o.quotationOk;
       $('customer').value=o.customer||''; $('lineId').value=o.lineId||''; $('phone').value=o.phone||'';
       setChecked('slot', o.slots||[]); $('slotNote').value=o.slotNote||''; $('slotNote').classList.toggle('hidden', !((o.slots||[]).includes('日期指定') || (o.slots||[]).includes('時間指定'))); $('address').value=o.address||'';
