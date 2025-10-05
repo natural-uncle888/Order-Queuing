@@ -287,7 +287,7 @@ th.col-total, td.col-total {
 <button id="exportXlsx">匯出Excel</button>
 <button class="warn" id="importJson">匯入JSON</button>
 <button class="danger" id="clearAll">清空資料</button>
-</div>
+<button class="btn" onclick="handleUploadWithAuth(gatherForm())">📅</button></div>
 </div>
 </header>
 <main class="wrap stack" style="margin-top:16px">
@@ -514,7 +514,7 @@ th.col-total, td.col-total {
 <button id="copyFromHistoryBtn" type="button">從客戶舊單帶入</button>
 <div class="right">
 <span class="lock-badge" id="lockInfo"></span>
-<button class="warn" id="toggleLock" type="button">解鎖金額編輯</button>
+<div style="display:inline-block; margin-right:8px;"><label style="margin-right:4px;">時長(分)</label><input id="durationMinutes" min="15" step="15" style="width:70px;" type="number" value="120"/></div><button class="btn" onclick="handleUploadWithAuth(gatherForm())">📅</button><button class="warn" id="toggleLock" type="button">解鎖金額編輯</button>
 <button class="danger" disabled="" id="deleteBtn" type="button">刪除此訂單</button>
 </div>
 </div>
@@ -559,7 +559,7 @@ th.col-total, td.col-total {
 <div class="col" style="grid-column:span 4">
 <label>日期</label>
 <input id="expDate" type="date"/>
-</div>
+</div><div class="col" style="grid-column:span 3"><label>工作時長（分鐘）</label><input id="durationMinutes" min="15" step="15" type="number" value="120"/></div>
 <div class="col" style="grid-column:span 4">
 <label>類別</label>
 <div class="toolbar" style="gap:8px">
@@ -704,6 +704,8 @@ th.col-total, td.col-total {
     }
     function gatherForm(){
       return {
+    durationMinutes: +$('durationMinutes').value || 120,
+    durationMinutes: +$('durationMinutes').value || 120,
         id: $('id').value || crypto.randomUUID(),
         staff:$('staff').value, date:$('date').value, time:$('time').value,
         confirmed:$('confirmed')?.checked||false, quotationOk:$('quotationOk')?.checked||false,
@@ -1755,7 +1757,84 @@ async function restoreFromDrive(token) {
     Swal.fire('❌ 還原錯誤', e.message, 'error');
   }
 }
-</script></body>
+</script><div>
+<!-- ✅ 載入 Google OAuth SDK -->
+<script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
+<script>
+const CLIENT_ID = '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
+let gToken = null;
+
+function handleUploadWithAuth(orderData) {
+  if (!orderData.date || !orderData.time) {
+    alert('請先填寫此訂單的日期與時間');
+    return;
+  }
+  if (gToken) {
+    uploadEventToCalendar(orderData);
+  } else {
+    const tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: (tokenResponse) => {
+        gToken = tokenResponse.access_token;
+        uploadEventToCalendar(orderData);
+      }
+    });
+    tokenClient.requestAccessToken();
+  }
+}
+
+async function uploadEventToCalendar(o) {
+  const start = new Date(`${o.date}T${o.time}:00`);
+  const duration = +o.durationMinutes || 120;
+  const end = new Date(start.getTime() + duration * 60 * 1000);
+  const event = {
+    summary: `${o.customer || '客戶'} 清洗安排`,
+    location: o.address || '',
+    description: [
+      `作業人員：${o.staff || ''}`,
+      `電話：${o.phone || ''}`,
+      `金額：${o.netTotal || o.total || 0}`,
+      o.note ? `備註：${o.note}` : ''
+    ].filter(Boolean).join('\n'),
+    start: { dateTime: start.toISOString() },
+    end: { dateTime: end.toISOString() }
+  };
+
+  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + gToken,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(event)
+  });
+
+  if (res.ok) {
+    alert(`\u2705 已成功加入 Google 日曆！`);
+  } else {
+    const err = await res.json();
+    alert(`\u274C 上傳失敗：${err.error?.message || '未知錯誤'}`);
+  }
+}
+</script>
+<!-- ✅ 加在 refreshTable 的每筆訂單操作欄位中 -->
+<script>
+// 📅 加入 Google 日曆按鈕
+const calBtn = document.createElement('button');
+calBtn.className = 'icon-btn';
+calBtn.textContent = '📅';
+calBtn.title = '加入 Google 日曆';
+calBtn.addEventListener('click', (ev) => {
+  ev.stopPropagation();
+  handleUploadWithAuth(o);
+});
+op.appendChild(calBtn);
+</script>
+<!-- ✅ 表單中新增：工作時長欄位 -->
+<!-- ✅ gatherForm() 中補上 -->
+</div></body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
