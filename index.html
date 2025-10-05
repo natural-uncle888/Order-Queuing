@@ -1663,6 +1663,28 @@ function initGoogleBackup() {
   if (!tokenClient) initGoogle();
   tokenClient.requestAccessToken();
 }
+function extractCityDistrict(address) {
+  if (!address) return { city: '', district: '' };
+  const match = address.match(/^(.*?[市縣])\s*([\u4e00-\u9fa5]{1,4}[區鄉鎮市])/);
+  if (match) {
+    return { city: match[1], district: match[2] };
+  }
+  return { city: '', district: '' };
+}
+function getOrderItems(o) {
+  let items = [];
+  if (+o.acSplit > 0) items.push(`分離式冷氣${o.acSplit}台`);
+  if (+o.acDuct > 0) items.push(`吊隱式冷氣${o.acDuct}台`);
+  if (+o.washerTop > 0) items.push(`直立式洗衣機${o.washerTop}台`);
+  if (+o.waterTank > 0) items.push(`水塔${o.waterTank}顆`);
+  if (+o.pipesAmount > 0) items.push(`自來水管`);
+  if (+o.antiMold > 0) items.push(`防霉${o.antiMold}台`);
+  if (+o.ozone > 0) items.push(`臭氧殺菌${o.ozone}間`);
+  if (+o.transformerCount > 0) items.push(`變形金剛${o.transformerCount}台`);
+  if (+o.longSplitCount > 0) items.push(`分離式>182cm ${o.longSplitCount}台`);
+  if (+o.onePieceTray > 0) items.push(`一體式水盤${o.onePieceTray}台`);
+  return items.join('、');
+}    
 </script><script>
 async function backupToDrive(token) {
   try {
@@ -1788,8 +1810,14 @@ async function uploadEventToCalendar(o) {
   const start = new Date(`${o.date}T${o.time}:00`);
   const duration = +o.durationMinutes || 120;
   const end = new Date(start.getTime() + duration * 60 * 1000);
+
+  // 新增：自動組合縣市區＋姓名＋清洗項目
+  const { city, district } = extractCityDistrict(o.address || '');
+  const orderItems = getOrderItems(o);
+  const summary = `${city}${district} ${o.customer || ''} ${orderItems}`;
+
   const event = {
-    summary: `${o.customer || '客戶'} 清洗安排`,
+    summary, // ← 用自訂格式
     location: o.address || '',
     description: [
       `作業人員：${o.staff || ''}`,
