@@ -309,7 +309,10 @@ th.col-total, td.col-total {
   }
 }
 </style>
-<script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script></head>
+<script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11">
+
+
+</script></head>
 <body>
 <header>
 <div class="wrap toolbar">
@@ -852,6 +855,7 @@ th.col-total, td.col-total {
           <td class="small muted" data-label="#">${idx+1}</td>
           <td class="editable" data-label="日期">${dateCell}</td>
           <td class="editable" data-label="時間">${o.time ? o.time : '<span class=\"badge-soft\">未排定</span>'}</td>
+
           <td data-label="作業人員">${o.staff||''}</td>
           <td data-label="客戶">${o.customer||''}</td>
           <td data-label="電話">${o.phone||''}</td>
