@@ -1817,13 +1817,13 @@ async function uploadEventToCalendar(o) {
   const summary = `${city}${district} ${o.customer || ''} ${orderItems}`;
 
   const event = {
-    summary, // ← 用自訂格式
+    summary,
     location: o.address || '',
     description: [
-      `作業人員：${o.staff || ''}`,
+      `姓名：${o.customer || ''}`,
       `電話：${o.phone || ''}`,
-      `金額：${o.netTotal || o.total || 0}`,
-      o.note ? `備註：${o.note}` : ''
+      (o.acFloors && o.acFloors.length > 0) ? `冷氣位於樓層：${o.acFloors.join('、')}` : '',
+      (o.washerFloors && o.washerFloors.length > 0) ? `洗衣機位於樓層：${o.washerFloors.join('、')}` : ''
     ].filter(Boolean).join('\n'),
     start: { dateTime: start.toISOString() },
     end: { dateTime: end.toISOString() }
