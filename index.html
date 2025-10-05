@@ -558,7 +558,7 @@ th.col-total, td.col-total {
 <div class="col" style="grid-column:span 4">
 <label>日期</label>
 <input id="expDate" type="date"/>
-</div><div class="col" style="grid-column:span 3"><label>工作時長（分鐘）</label><input id="durationMinutes" min="15" step="15" type="number" value="120"/></div>
+</div><div class="col" style="grid-column:span 3"><label>工作時長（分鐘）</label><input id="expDurationMinutes" min="15" step="15" type="number" value="120"/></div>
 <div class="col" style="grid-column:span 4">
 <label>類別</label>
 <div class="toolbar" style="gap:8px">
@@ -724,6 +724,7 @@ th.col-total, td.col-total {
       $('orderAccordion').open = true; $('orderAccordion').scrollIntoView({behavior:'smooth', block:'start'});
       $('id').value=o.id||''; $('staff').value=o.staff||staffList[0];
       $('date').value=o.date||''; $('time').value=o.time||'';
+      $('durationMinutes').value = o.durationMinutes || 120;
       $('confirmed').checked=!!o.confirmed; $('quotationOk').checked=!!o.quotationOk;
       $('customer').value=o.customer||''; $('lineId').value=o.lineId||''; $('phone').value=o.phone||'';
       setChecked('slot', o.slots||[]); $('slotNote').value=o.slotNote||''; $('slotNote').classList.toggle('hidden', !((o.slots||[]).includes('日期指定') || (o.slots||[]).includes('時間指定'))); $('address').value=o.address||'';
