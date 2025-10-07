@@ -310,8 +310,6 @@ th.col-total, td.col-total {
 }
 </style>
 <script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11">
-
-
 </script></head>
 <body>
 <header>
@@ -562,15 +560,22 @@ th.col-total, td.col-total {
 </div>
 </div>
 <div class="row">
-<div class="col" style="grid-column:span 4">
+<div class="col" style="grid-column:span 3">
 <label>總金額（自動）</label>
 <input id="total" readonly="" type="number"/>
 </div>
-<div class="col" style="grid-column:span 4">
+
+<div class="col" style="grid-column:span 3">
+<label>額外加價（手動輸入）</label>
+<input id="extraCharge" min="0" step="1" type="number" value="0"/>
+</div>
+
+<div class="col" style="grid-column:span 3">
 <label>折扣金額（可輸入）</label>
 <input id="discount" min="0" step="1" type="number" value="0"/>
 </div>
-<div class="col" style="grid-column:span 4">
+
+<div class="col" style="grid-column:span 3">
 <label>折後總金額（自動）</label>
 <input id="netTotal" readonly="" type="number"/>
 </div>
