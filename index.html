@@ -466,11 +466,11 @@ th.col-total, td.col-total {
 <div class="col" style="grid-column:span 6">
 <label>冷氣位於樓層（可複選）</label>
 <div class="checkbox-group" id="acFloors"></div>
-</div>
+<input class="hidden tiny" id="acFloorNote" placeholder="請輸入樓層範圍（如 6F以上 或 頂樓加蓋）" type="text"/></div>
 <div class="col" style="grid-column:span 6">
 <label>洗衣機位於樓層（可複選）</label>
 <div class="checkbox-group" id="washerFloors"></div>
-</div>
+<input class="hidden tiny" id="washerFloorNote" placeholder="請輸入樓層範圍（如 6F以上 或 頂樓加蓋）" type="text"/></div>
 </div>
 <div class="row">
 <div class="col" style="grid-column:span 8">
@@ -560,19 +560,15 @@ th.col-total, td.col-total {
 </div>
 </div>
 <div class="row">
-<div class="col" style="grid-column:span 3">
+<div class="col" style="grid-column:span 4">
 <label>總金額（自動）</label>
 <input id="total" readonly="" type="number"/>
 </div>
-<div class="col" style="grid-column:span 3">
-<label>額外加價（手動輸入）</label>
-<input id="extraCharge" min="0" step="1" type="number" value="0"/>
-</div>
-<div class="col" style="grid-column:span 3">
+<div class="col" style="grid-column:span 4">
 <label>折扣金額（可輸入）</label>
 <input id="discount" min="0" step="1" type="number" value="0"/>
 </div>
-<div class="col" style="grid-column:span 3">
+<div class="col" style="grid-column:span 4">
 <label>折後總金額（自動）</label>
 <input id="netTotal" readonly="" type="number"/>
 </div>
@@ -679,7 +675,7 @@ th.col-total, td.col-total {
     const pad2 = n => n.toString().padStart(2,'0');
     const SLOT_OPTS = ['平日','假日','上午','下午','皆可','日期指定'];
     const CONTACT_TIME_OPTS = ['平日','假日','上午','下午','晚上','皆可','時間指定'];
-    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','有電梯'];
+    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','有電梯','5樓以上'];
     const STATUS_FLOW = ['排定','完成','未完成'];
 
     function renderChecks(containerId, options, name){
@@ -789,7 +785,7 @@ th.col-total, td.col-total {
         acSplit:+$('acSplit').value||0, acDuct:+$('acDuct').value||0, washerTop:+$('washerTop').value||0, waterTank:+$('waterTank').value||0,
         pipesAmount:+$('pipesAmount').value||0, antiMold:+$('antiMold').value||0, ozone:+$('ozone').value||0,
         transformerCount:+$('transformerCount').value||0, longSplitCount:+$('longSplitCount').value||0, onePieceTray:+$('onePieceTray').value||0,
-        note:$('note').value.trim(), total:+$('total').value||0, extraCharge:+$('extraCharge').value||0, discount:+$('discount').value||0, netTotal:+$('netTotal').value||0,
+        note:$('note').value.trim(), total:+$('total').value||0, discount:+$('discount').value||0, netTotal:+$('netTotal').value||0,
         createdAt:$('id').value ? undefined : new Date().toISOString()
       };
     }
@@ -812,7 +808,7 @@ th.col-total, td.col-total {
       setFormLock(!!o.locked);
       if(o.completedAt){ $('lockInfo').textContent = '完成於 ' + new Date(o.completedAt).toLocaleString(); }
     }
-    function recalcTotals(){ const total=calcTotal(gatherForm()); $('total').value=total; const extra=Math.max(0,+$('extraCharge').value||0); const discount=Math.max(0,+$('discount').value||0); $('netTotal').value=Math.max(0,total+extra-discount); }
+    function recalcTotals(){ const total=calcTotal(gatherForm()); $('total').value=total; const discount=Math.max(0,+$('discount').value||0); $('netTotal').value=Math.max(0,total-discount); }
 
     function setFormLock(lock){
       const ids=['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount','recalc'];
@@ -972,7 +968,8 @@ th.col-total, td.col-total {
         const slots = `時段：${(o.slots||[]).join('、')}`;
         const price = `金額(折後)：${o.netTotal||o.total||0}`;
         const note = o.note ? `備註：${o.note}` : '';
-        const desc = sanitizeText([staff, tel, slots, price, note].filter(Boolean).join('\\n'));
+        const floorNotes = [o.acFloorNote ? `冷氣樓層備註：${o.acFloorNote}` : '', o.washerFloorNote ? `洗衣機樓層備註：${o.washerFloorNote}` : ''].filter(Boolean).join('\\n');
+        const desc = sanitizeText([staff, tel, slots, price, note, floorNotes].filter(Boolean).join('\\n'));
         const loc = sanitizeText(o.address||'');
         const uid = o.id || (dtStart + '@yl-clean');
         lines.push('BEGIN:VEVENT');
@@ -1066,7 +1063,7 @@ th.col-total, td.col-total {
         '居住地型態','居住地型態(其他)','方便聯繫時間(多選)','方便聯繫備註',
         '冷氣樓層(多選)','洗衣機樓層(多選)','聯繫方式','狀況','完成時間','金額鎖定',
         '分離式室內機','吊隱式','直立式洗衣機','水塔','自來水管金額','防霉噴劑','臭氧殺菌','變形金剛加價','長度>182cm加價','一體式水盤',
-        '備註','總金額','折扣金額','折後總金額','建立時間'
+        '備註','額外加價','冷氣樓層備註','洗衣機樓層備註','總金額','折扣金額','折後總金額','建立時間'
       ];
 
       const includeUndated = !!($('showUndated') && $('showUndated').checked);
@@ -1107,7 +1104,7 @@ th.col-total, td.col-total {
           +o.transformerCount||0,
           +o.longSplitCount||0,
           +o.onePieceTray||0,
-          (o.note||'').replace(/\n/g,' '),
+          (o.note||'').replace(/\n/g,' '), o.extraCharge||0, o.acFloorNote||'', o.washerFloorNote||'',
           +o.total||0,
           +o.discount||0,
           +o.netTotal||0,
@@ -1230,12 +1227,12 @@ th.col-total, td.col-total {
     function resetForm(){ fillForm({}); }
     function download(filename, text){ const blob=new Blob([text],{type:'application/octet-stream'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); }
     function exportCSV(){
-      const headers=['id','作業人員','日期','時間','確認','報價單','姓名','LINE_ID','電話','安排時段(多選)','地址','冷氣樓屯(多選)','洗衣機樓層(多選)','聯繫方式','狀況','完成時間','金額鎖定','分離式室內機','吊隱式','直立式洗衣機','水塔','自來水管金額','防霉噴劑','臭氧殺菌','變形金剛加價','長度>182cm加價','一體式水盤','備註','總金額','折扣金額','折後總金額','建立時間'];
-      const rows=orders.map(o=>[o.id,o.staff,o.date||'',o.time,o.confirmed?'是':'否',o.quotationOk?'是':'否',o.customer,o.lineId,o.phone,(o.slots||[]).join('|'),o.address,(o.acFloors||[]).join('|'),(o.washerFloors||[]).join('|'),o.contactMethod,o.status,o.completedAt||'',o.locked?'是':'否',o.acSplit,o.acDuct,o.washerTop,o.waterTank,o.pipesAmount,o.antiMold,o.ozone,o.transformerCount,o.longSplitCount,o.onePieceTray,(o.note||'').replace(/\n/g,' '),o.total,o.discount,o.netTotal,o.createdAt||'']);
+      const headers=['id','作業人員','日期','時間','確認','報價單','姓名','LINE_ID','電話','安排時段(多選)','地址','冷氣樓屯(多選)','洗衣機樓層(多選)','聯繫方式','狀況','完成時間','金額鎖定','分離式室內機','吊隱式','直立式洗衣機','水塔','自來水管金額','防霉噴劑','臭氧殺菌','變形金剛加價','長度>182cm加價','一體式水盤','備註','額外加價','冷氣樓層備註','洗衣機樓層備註','總金額','折扣金額','折後總金額','建立時間'];
+      const rows=orders.map(o=>[o.id,o.staff,o.date||'',o.time,o.confirmed?'是':'否',o.quotationOk?'是':'否',o.customer,o.lineId,o.phone,(o.slots||[]).join('|'),o.address,(o.acFloors||[]).join('|'),(o.washerFloors||[]).join('|'),o.contactMethod,o.status,o.completedAt||'',o.locked?'是':'否',o.acSplit,o.acDuct,o.washerTop,o.waterTank,o.pipesAmount,o.antiMold,o.ozone,o.transformerCount,o.longSplitCount,o.onePieceTray,(o.note||'').replace(/\n/g,' '), o.extraCharge||0, o.acFloorNote||'', o.washerFloorNote||'',o.total,o.discount,o.netTotal,o.createdAt||'']);
       const csv=[headers.join(','),...rows.map(r=>r.map(x=>{const s=(x??'').toString();return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;}).join(','))].join('\n');
       download(`訂單_${$('yearSel').value}-${pad2($('monthSel').value)}.csv`, csv);
     }
-    function exportJSON(){ download(`訂單資料備份.json`, JSON.stringify({orders, staffList, contactList}, null, 2)); }
+    function exportJSON(){ download(`訂單資料備份.json`, JSON.stringify({orders, staffList, contactList, extraFields: ['extraCharge','acFloorNote','washerFloorNote']}, null, 2)); }
     function importJSON(){ $('filePicker').click(); }
     $('filePicker')?.addEventListener('change',(e)=>{
       const file=e.target.files[0]; if(!file) return;
@@ -1447,7 +1444,32 @@ $('importJson').addEventListener('click', importJSON);
       initYearMonth(); initStaffSelects(); initContactSelect(); initCheckboxes(); initExpenseCats();
       attachEvents(); refreshContactsDatalist(); fillForm({}); fillExpForm({}); refreshTable(); refreshExpense();
     })();
-  </script>
+  
+
+
+    // === 顯示或隱藏樓層手動輸入框 ===
+    function bindFloorInputToggle() {
+      const acInputs = document.querySelectorAll('input[data-name="acFloor"]');
+      const washerInputs = document.querySelectorAll('input[data-name="washerFloor"]');
+      const acNote = document.getElementById('acFloorNote');
+      const washerNote = document.getElementById('washerFloorNote');
+
+      function toggleNote(inputs, noteEl) {
+        if (!noteEl) return;
+        const checked = Array.from(inputs).some(i => i.checked && i.value === '5樓以上');
+        noteEl.classList.toggle('hidden', !checked);
+      }
+
+      acInputs.forEach(i => i.addEventListener('change', () => toggleNote(acInputs, acNote)));
+      washerInputs.forEach(i => i.addEventListener('change', () => toggleNote(washerInputs, washerNote)));
+
+      // 初始也觸發一次
+      toggleNote(acInputs, acNote);
+      toggleNote(washerInputs, washerNote);
+    }
+
+    document.addEventListener('DOMContentLoaded', bindFloorInputToggle);
+    </script>
 <script>
 /* ===== Offline .xlsx exporter (no external deps) =====
    Builds a minimal XLSX (2 sheets) using uncompressed ZIP.
