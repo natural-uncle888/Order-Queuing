@@ -564,17 +564,14 @@ th.col-total, td.col-total {
 <label>總金額（自動）</label>
 <input id="total" readonly="" type="number"/>
 </div>
-
 <div class="col" style="grid-column:span 3">
 <label>額外加價（手動輸入）</label>
 <input id="extraCharge" min="0" step="1" type="number" value="0"/>
 </div>
-
 <div class="col" style="grid-column:span 3">
 <label>折扣金額（可輸入）</label>
 <input id="discount" min="0" step="1" type="number" value="0"/>
 </div>
-
 <div class="col" style="grid-column:span 3">
 <label>折後總金額（自動）</label>
 <input id="netTotal" readonly="" type="number"/>
@@ -792,7 +789,7 @@ th.col-total, td.col-total {
         acSplit:+$('acSplit').value||0, acDuct:+$('acDuct').value||0, washerTop:+$('washerTop').value||0, waterTank:+$('waterTank').value||0,
         pipesAmount:+$('pipesAmount').value||0, antiMold:+$('antiMold').value||0, ozone:+$('ozone').value||0,
         transformerCount:+$('transformerCount').value||0, longSplitCount:+$('longSplitCount').value||0, onePieceTray:+$('onePieceTray').value||0,
-        note:$('note').value.trim(), total:+$('total').value||0, discount:+$('discount').value||0, netTotal:+$('netTotal').value||0,
+        note:$('note').value.trim(), total:+$('total').value||0, extraCharge:+$('extraCharge').value||0, discount:+$('discount').value||0, netTotal:+$('netTotal').value||0,
         createdAt:$('id').value ? undefined : new Date().toISOString()
       };
     }
@@ -815,7 +812,7 @@ th.col-total, td.col-total {
       setFormLock(!!o.locked);
       if(o.completedAt){ $('lockInfo').textContent = '完成於 ' + new Date(o.completedAt).toLocaleString(); }
     }
-    function recalcTotals(){ const total=calcTotal(gatherForm()); $('total').value=total; const discount=Math.max(0,+$('discount').value||0); $('netTotal').value=Math.max(0,total-discount); }
+    function recalcTotals(){ const total=calcTotal(gatherForm()); $('total').value=total; const extra=Math.max(0,+$('extraCharge').value||0); const discount=Math.max(0,+$('discount').value||0); $('netTotal').value=Math.max(0,total+extra-discount); }
 
     function setFormLock(lock){
       const ids=['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount','recalc'];
