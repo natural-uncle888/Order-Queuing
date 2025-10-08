@@ -308,9 +308,62 @@ th.col-total, td.col-total {
     text-overflow: ellipsis;
   }
 }
+
+/* --- Reminders (Due Service) --- */
+.badge{display:inline-block;min-width:1.5em;padding:.1em .5em;border-radius:9999px;background:#ef4444;color:#fff;font-weight:700;font-size:.85em;vertical-align:middle;text-align:center}
+.badge.muted{background:#9ca3af}
+.reminder-panel{border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin:10px 0;background:#fff}
+.reminder-item{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px dashed #eee}
+.reminder-item:last-child{border-bottom:none}
+.reminder-title{font-weight:600}
+tr.due td{background:#fff7ed}
+tr.overdue td{background:#fef2f2}
+.settings-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.settings-row label{font-size:.9em;color:#374151}
+
 </style>
-<script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11">
+
+function renderContactsTable() {
+  const tbody = $('contactsTable').querySelector('tbody');
+  tbody.innerHTML = contacts.map((c, idx) => {
+    const cy = c.periodYears ?? '';
+    return `
+      <tr>
+        <td>${escapeHtml(c.name || '')}</td>
+        <td>${escapeHtml(c.phone || '')}</td>
+        <td>${escapeHtml(c.address || '')}</td>
+        <td>${escapeHtml(c.lineId || '')}</td>
+        <td><input type="number" min="1" step="1" data-idx="${idx}" value="${cy}" style="width:80px"/></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function saveContactPeriods() {
+  const inputs = $('contactsTable').querySelectorAll('input[type="number"]');
+  let changed = 0;
+  inputs.forEach(input => {
+    const idx = +input.dataset.idx;
+    const val = input.value.trim();
+    if (val === '') {
+      delete contacts[idx].periodYears;
+      changed++;
+    } else {
+      const n = +val;
+      if (!isNaN(n) && n > 0) {
+        contacts[idx].periodYears = n;
+        changed++;
+      }
+    }
+  });
+  save(CONTACTS_KEY, contacts);
+  alert(`已儲存 ${changed} 筆通訊錄變更`);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (typeof renderContactsTable === 'function') renderContactsTable();
+});
 </script></head>
 <body>
 <header>
@@ -359,38 +412,6 @@ th.col-total, td.col-total {
 </div>
 </header>
 <main class="wrap stack" style="margin-top:16px">
-<!-- BEGIN: 保養提醒（獨立卡片，位於訂單列表之前） -->
-<section class="card" id="reminderSection">
-  <h2>保養提醒</h2>
-  <div class="body">
-    <div id="reminderSummary" class="sum"></div>
-    <div class="hr"></div>
-    <div id="reminderList" style="overflow:auto">
-<div class="toolbar" id="reminderControls" style="display:flex;gap:12px;align-items:center;margin:8px 0">
-  <div class="pill"><strong>篩選</strong>
-    <select id="reminderFilter">
-      <option value="active">僅顯示有效提醒</option>
-      <option value="all">顯示全部（含靜音/暫停）</option>
-      <option value="muted">只看不再提醒</option>
-      <option value="snoozed">只看暫停中</option>
-    </select>
-  </div>
-  <div class="pill"><strong>快速暫停</strong>
-    <select id="bulkSnooze">
-      <option value="">— 對選取的顧客 —</option>
-      <option value="7">暫停 7 天</option>
-      <option value="30">暫停 30 天</option>
-      <option value="90">暫停 90 天</option>
-    </select>
-  </div>
-  <div class="pill">
-    <button id="bulkUnmute" type="button">恢復提醒</button>
-  </div>
-</div></div>
-  </div>
-</section>
-<!-- END: 保養提醒（獨立卡片，位於訂單列表之前） -->
-
 <!-- 訂單列表（上） -->
 <section class="card">
 <h2>訂單列表</h2>
@@ -401,7 +422,45 @@ th.col-total, td.col-total {
         1) 點「狀況」籤可快速切換（排定 → 完成 → 未完成）。
         2) 直接點「日期」或「時間」欄可快速編輯；Enter/失焦儲存，Esc 取消。 3) 右上可用關鍵字搜尋（姓名/電話/地址），結果會自動高亮。
         未填日期會標記 <span class="badge-soft">未排期</span>、未填時間會標記 <span class="badge-soft">未排定</span>。</div>
+
+<details class="accordion" id="contactsAcc">
+<summary>📇 通訊錄管理（週期批次調整）</summary>
+<div class="content">
+<div class="toolbar" style="margin-bottom:12px">
+<button class="primary" onclick="saveContactPeriods()">儲存變更</button>
+<span class="tiny muted">提示：欄位留空代表使用全域預設週期</span>
+</div>
+<div style="overflow:auto; max-height:400px">
+<table id="contactsTable">
+<thead>
+<tr>
+<th>姓名</th>
+<th>電話</th>
+<th>地址</th>
+<th>LINE ID</th>
+<th>週期(年)</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
+</details>
 <div style="overflow:auto;margin-top:8px">
+<!-- Reminder / Alerts -->
+<section class="reminder-panel" id="reminderPanel">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+<div><span style="font-weight:700">到期提醒</span> <span class="badge muted" id="reminderCount">0</span></div>
+<div class="settings-row">
+<label>週期(年)：<input id="remYears" min="1" step="1" style="width:70px" type="number" value="2"/></label>
+<label>提前提醒(天)：<input id="leadDays" min="0" step="1" style="width:90px" type="number" value="30"/>
+<label>通知冷卻(天)：<input id="cooldownDays" min="0" step="1" style="width:90px" type="number" value="7"/></label></label>
+<button class="inline-btn" id="saveRemPrefs" type="button">儲存</button>
+<button class="inline-btn" id="pushNotify" type="button">桌面通知</button>
+</div>
+</div>
+<div class="tiny" id="reminderList">目前沒有即將到期的客戶。</div>
+</section>
 <table id="ordersTable">
 <thead>
 <tr>
@@ -428,9 +487,9 @@ th.col-total, td.col-total {
 </div>
 </section>
 <!-- 訂單表單（中） -->
-<details class="accordion" id="orderAccordion"><summary><span id="formTitle">新增 / 編輯訂單</span></summary><div class="content">
+<details ="true"="" class="accordion" id="orderAccordion"><summary><span id="formTitle">新增 / 編輯訂單</span></summary><div class="content">
 <form id="orderForm">
-<input id="id" type="hidden"/>
+<input id="id" type="hidden">
 <div class="row">
 <div class="col" style="grid-column:span 6">
 <label>作業人員</label>
@@ -441,12 +500,12 @@ th.col-total, td.col-total {
 </div>
 <div class="col" style="grid-column:span 3">
 <label>日期（可留空，之後再填）</label>
-<input id="date" type="date"/>
-</div>
+<input id="date" type="date">
+</input></div>
 <div class="col" style="grid-column:span 3">
 <label>時間</label>
-<input id="time" type="time"/>
-</div>
+<input id="time" type="time">
+</input></div>
 </div>
 <div class="row">
 <div class="col" style="grid-column:span 6">
@@ -463,6 +522,11 @@ th.col-total, td.col-total {
 <label>電話</label>
 <input id="phone" placeholder="0912-345-678（可含 - ）" type="text"/>
 </div>
+</div>
+<div class="col" style="grid-column:span 3">
+<label>客製週期(年)</label>
+<input id="customerPeriodYears" min="1" placeholder="例如 2" step="1" type="number"/>
+<div class="tiny">留空則使用全域設定</div>
 </div>
 <div class="row">
 <div class="col" style="grid-column:span 5">
@@ -499,11 +563,11 @@ th.col-total, td.col-total {
 <div class="col" style="grid-column:span 6">
 <label>冷氣位於樓層（可複選）</label>
 <div class="checkbox-group" id="acFloors"></div>
-</div>
+<input class="hidden tiny" id="acFloorNote" placeholder="請輸入樓層範圍（如 6F以上 或 頂樓加蓋）" type="text"/></div>
 <div class="col" style="grid-column:span 6">
 <label>洗衣機位於樓層（可複選）</label>
 <div class="checkbox-group" id="washerFloors"></div>
-</div>
+<input class="hidden tiny" id="washerFloorNote" placeholder="請輸入樓層範圍（如 6F以上 或 頂樓加蓋）" type="text"/></div>
 </div>
 <div class="row">
 <div class="col" style="grid-column:span 8">
@@ -526,7 +590,7 @@ th.col-total, td.col-total {
 <h3 style="margin:0 0 8px">清洗項目與價格</h3>
 <div class="row">
 <div class="col" style="grid-column:span 6">
-<label><b><span style="color:red;font-size:15px">分離式冷氣室內機（每台1800；滿3台每台1500）</span></b></label>
+<label>分離式冷氣室內機（每台1800；滿3台每台1500）</label>
 <input id="acSplit" min="0" step="1" type="number" value="0"/>
 </div>
 <div class="col" style="grid-column:span 6">
@@ -536,7 +600,7 @@ th.col-total, td.col-total {
 </div>
 <div class="row">
 <div class="col" style="grid-column:span 6">
-<label><b><span style="color:red;font-size:15px">直立式洗衣機（每台2000；若同單含冷氣室內機則每台1800）</span></b></label>
+<label>直立式洗衣機（每台2000；若同單含冷氣室內機則每台1800）</label>
 <input id="washerTop" min="0" step="1" type="number" value="0"/>
 </div>
 <div class="col" style="grid-column:span 6">
@@ -550,7 +614,7 @@ th.col-total, td.col-total {
 <input id="pipesAmount" min="0" step="1" type="number" value="0"/>
 </div>
 <div class="col" style="grid-column:span 6">
-<label><b><span style="color:red;font-size:15px">防霉噴劑（每台300；滿5台每台250）</span></b></label>
+<label>防霉噴劑（每台300；滿5台每台250）</label>
 <input id="antiMold" min="0" step="1" type="number" value="0"/>
 </div>
 </div>
@@ -593,19 +657,15 @@ th.col-total, td.col-total {
 </div>
 </div>
 <div class="row">
-<div class="col" style="grid-column:span 3">
+<div class="col" style="grid-column:span 4">
 <label>總金額（自動）</label>
 <input id="total" readonly="" type="number"/>
 </div>
-<div class="col" style="grid-column:span 3">
-<label>額外加價（手動輸入）</label>
-<input id="extraCharge" min="0" step="1" type="number" value="0"/>
-</div>
-<div class="col" style="grid-column:span 3">
+<div class="col" style="grid-column:span 4">
 <label>折扣金額（可輸入）</label>
 <input id="discount" min="0" step="1" type="number" value="0"/>
 </div>
-<div class="col" style="grid-column:span 3">
+<div class="col" style="grid-column:span 4">
 <label>折後總金額（自動）</label>
 <input id="netTotal" readonly="" type="number"/>
 </div>
@@ -622,7 +682,7 @@ th.col-total, td.col-total {
 <button class="danger" disabled="" id="deleteBtn" type="button">刪除此訂單</button>
 </div>
 </div>
-</form>
+</input></form>
 </div></details>
 <!-- 支出模組（下）以手風琴呈現 -->
 <details =""="" class="accordion" id="expenseAcc">
@@ -712,7 +772,7 @@ th.col-total, td.col-total {
     const pad2 = n => n.toString().padStart(2,'0');
     const SLOT_OPTS = ['平日','假日','上午','下午','皆可','日期指定'];
     const CONTACT_TIME_OPTS = ['平日','假日','上午','下午','晚上','皆可','時間指定'];
-    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','有電梯'];
+    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','有電梯','5樓以上'];
     const STATUS_FLOW = ['排定','完成','未完成'];
 
     function renderChecks(containerId, options, name){
@@ -740,7 +800,7 @@ th.col-total, td.col-total {
     const CONTACTS_KEY = 'yl_clean_contacts_v1';
     let contacts = load(CONTACTS_KEY, []); // {id,name,phone,address,lineId}
     function normalizePhone(p){ return (p||'').replace(/\D+/g,''); }
-    function upsertContact(name, phone, address, lineId){
+    function upsertContact(name, phone, address, lineId, periodYears){
       const np = normalizePhone(phone);
       if(!name && !np) return;
       const idx = contacts.findIndex(c => normalizePhone(c.phone)===np && np);
@@ -749,6 +809,7 @@ th.col-total, td.col-total {
         contacts[idx].name = contacts[idx].name || name;
         contacts[idx].address = contacts[idx].address || address;
         contacts[idx].lineId = contacts[idx].lineId || lineId;
+        if(periodYears){ contacts[idx].periodYears = +periodYears; }
       }else{
         contacts.push({id: crypto.randomUUID(), name: name||'', phone: phone||'', address: address||'', lineId: lineId||''});
       }
@@ -809,6 +870,7 @@ th.col-total, td.col-total {
     function gatherForm(){
       return {
     durationMinutes: +$('durationMinutes').value || 120,
+    durationMinutes: +$('durationMinutes').value || 120,
         id: $('id').value || crypto.randomUUID(),
         staff:$('staff').value, date:$('date').value, time:$('time').value,
         confirmed:$('confirmed')?.checked||false, quotationOk:$('quotationOk')?.checked||false,
@@ -821,7 +883,7 @@ th.col-total, td.col-total {
         acSplit:+$('acSplit').value||0, acDuct:+$('acDuct').value||0, washerTop:+$('washerTop').value||0, waterTank:+$('waterTank').value||0,
         pipesAmount:+$('pipesAmount').value||0, antiMold:+$('antiMold').value||0, ozone:+$('ozone').value||0,
         transformerCount:+$('transformerCount').value||0, longSplitCount:+$('longSplitCount').value||0, onePieceTray:+$('onePieceTray').value||0,
-        note:$('note').value.trim(), total:+$('total').value||0, extraCharge:+$('extraCharge').value||0, discount:+$('discount').value||0, netTotal:+$('netTotal').value||0,
+        note:$('note').value.trim(), total:+$('total').value||0, discount:+$('discount').value||0, netTotal:+$('netTotal').value||0,
         createdAt:$('id').value ? undefined : new Date().toISOString()
       };
     }
@@ -843,8 +905,10 @@ th.col-total, td.col-total {
       $('deleteBtn').disabled=!o.id; $('formTitle').textContent=o.id?'編輯訂單':'新增訂單';
       setFormLock(!!o.locked);
       if(o.completedAt){ $('lockInfo').textContent = '完成於 ' + new Date(o.completedAt).toLocaleString(); }
-    }
-    function recalcTotals(){ const total=calcTotal(gatherForm()); $('total').value=total; const extra=Math.max(0,+$('extraCharge').value||0); const discount=Math.max(0,+$('discount').value||0); $('netTotal').value=Math.max(0,total+extra-discount); }
+    
+      try{ const c = (typeof findContactByName==='function')? findContactByName(o.customer):null; if(c && $('customerPeriodYears')) $('customerPeriodYears').value = c.periodYears || ''; }catch{}
+}
+    function recalcTotals(){ const total=calcTotal(gatherForm()); $('total').value=total; const discount=Math.max(0,+$('discount').value||0); $('netTotal').value=Math.max(0,total-discount); }
 
     function setFormLock(lock){
       const ids=['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount','recalc'];
@@ -869,7 +933,9 @@ th.col-total, td.col-total {
         const s1=!staffF || o.staff===staffF; const s2=!statusF || o.status===statusF;
         const condQuery = tokens.length===0 || tokens.every(t => hay(o).includes(t));
         const condRange = !range || (o.completedAt && (now - new Date(o.completedAt).getTime()) <= (+range)*24*60*60*1000);
-        if(!o.date){ return showUndated && s1 && s2 && condQuery && condRange; }
+        if(!o.date){ return showUndated && s1 && s2 && condQuery && condRange; 
+      refreshReminders();
+}
         const d=new Date(o.date); const ym=(d.getFullYear()===y && (d.getMonth()+1)===m);
         return ym && s1 && s2 && condQuery && condRange;
       }).sort((a,b)=>{
@@ -884,6 +950,8 @@ th.col-total, td.col-total {
 
       filtered.forEach((o,idx)=>{
         const tr=document.createElement('tr');
+        tr.setAttribute('data-customer', o.customer||'');
+        tr.setAttribute('data-address', o.address||'');
         const dateCell = o.date ? o.date : '<span class="badge-soft">未排期</span>';
         tr.innerHTML=`
           <td class="small muted" data-label="#">${idx+1}</td>
@@ -1004,7 +1072,8 @@ th.col-total, td.col-total {
         const slots = `時段：${(o.slots||[]).join('、')}`;
         const price = `金額(折後)：${o.netTotal||o.total||0}`;
         const note = o.note ? `備註：${o.note}` : '';
-        const desc = sanitizeText([staff, tel, slots, price, note].filter(Boolean).join('\\n'));
+        const floorNotes = [o.acFloorNote ? `冷氣樓層備註：${o.acFloorNote}` : '', o.washerFloorNote ? `洗衣機樓層備註：${o.washerFloorNote}` : ''].filter(Boolean).join('\\n');
+        const desc = sanitizeText([staff, tel, slots, price, note, floorNotes].filter(Boolean).join('\\n'));
         const loc = sanitizeText(o.address||'');
         const uid = o.id || (dtStart + '@yl-clean');
         lines.push('BEGIN:VEVENT');
@@ -1098,7 +1167,7 @@ th.col-total, td.col-total {
         '居住地型態','居住地型態(其他)','方便聯繫時間(多選)','方便聯繫備註',
         '冷氣樓層(多選)','洗衣機樓層(多選)','聯繫方式','狀況','完成時間','金額鎖定',
         '分離式室內機','吊隱式','直立式洗衣機','水塔','自來水管金額','防霉噴劑','臭氧殺菌','變形金剛加價','長度>182cm加價','一體式水盤',
-        '備註','總金額','折扣金額','折後總金額','建立時間'
+        '備註','額外加價','冷氣樓層備註','洗衣機樓層備註','總金額','折扣金額','折後總金額','建立時間'
       ];
 
       const includeUndated = !!($('showUndated') && $('showUndated').checked);
@@ -1139,7 +1208,7 @@ th.col-total, td.col-total {
           +o.transformerCount||0,
           +o.longSplitCount||0,
           +o.onePieceTray||0,
-          (o.note||'').replace(/\n/g,' '),
+          (o.note||'').replace(/\n/g,' '), o.extraCharge||0, o.acFloorNote||'', o.washerFloorNote||'',
           +o.total||0,
           +o.discount||0,
           +o.netTotal||0,
@@ -1237,7 +1306,16 @@ th.col-total, td.col-total {
     // ---------- Orders save/delete/export/import ----------
     function saveOrder(e){
       e.preventDefault();
-      recalcTotals();
+      
+      try{
+        const name = $('customer')?.value||'';
+        const phone = $('phone')?.value||'';
+        const address = $('address')?.value||'';
+        const lineId = $('lineId')?.value||'';
+        const periodYears = $('customerPeriodYears')?.value||'';
+        if(name || phone){ upsertContact(name, phone, address, lineId, periodYears); save(CONTACTS_KEY, contacts); }
+      }catch(e){ console.warn('upsertContactFromForm failed', e); }
+recalcTotals();
       const data=gatherForm(); // 日期可留空
       // handle completedAt & lock
       if(data.status==='完成'){
@@ -1262,12 +1340,12 @@ th.col-total, td.col-total {
     function resetForm(){ fillForm({}); }
     function download(filename, text){ const blob=new Blob([text],{type:'application/octet-stream'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); }
     function exportCSV(){
-      const headers=['id','作業人員','日期','時間','確認','報價單','姓名','LINE_ID','電話','安排時段(多選)','地址','冷氣樓屯(多選)','洗衣機樓層(多選)','聯繫方式','狀況','完成時間','金額鎖定','分離式室內機','吊隱式','直立式洗衣機','水塔','自來水管金額','防霉噴劑','臭氧殺菌','變形金剛加價','長度>182cm加價','一體式水盤','備註','總金額','折扣金額','折後總金額','建立時間'];
-      const rows=orders.map(o=>[o.id,o.staff,o.date||'',o.time,o.confirmed?'是':'否',o.quotationOk?'是':'否',o.customer,o.lineId,o.phone,(o.slots||[]).join('|'),o.address,(o.acFloors||[]).join('|'),(o.washerFloors||[]).join('|'),o.contactMethod,o.status,o.completedAt||'',o.locked?'是':'否',o.acSplit,o.acDuct,o.washerTop,o.waterTank,o.pipesAmount,o.antiMold,o.ozone,o.transformerCount,o.longSplitCount,o.onePieceTray,(o.note||'').replace(/\n/g,' '),o.total,o.discount,o.netTotal,o.createdAt||'']);
+      const headers=['id','作業人員','日期','時間','確認','報價單','姓名','LINE_ID','電話','安排時段(多選)','地址','冷氣樓屯(多選)','洗衣機樓層(多選)','聯繫方式','狀況','完成時間','金額鎖定','分離式室內機','吊隱式','直立式洗衣機','水塔','自來水管金額','防霉噴劑','臭氧殺菌','變形金剛加價','長度>182cm加價','一體式水盤','備註','額外加價','冷氣樓層備註','洗衣機樓層備註','總金額','折扣金額','折後總金額','建立時間'];
+      const rows=orders.map(o=>[o.id,o.staff,o.date||'',o.time,o.confirmed?'是':'否',o.quotationOk?'是':'否',o.customer,o.lineId,o.phone,(o.slots||[]).join('|'),o.address,(o.acFloors||[]).join('|'),(o.washerFloors||[]).join('|'),o.contactMethod,o.status,o.completedAt||'',o.locked?'是':'否',o.acSplit,o.acDuct,o.washerTop,o.waterTank,o.pipesAmount,o.antiMold,o.ozone,o.transformerCount,o.longSplitCount,o.onePieceTray,(o.note||'').replace(/\n/g,' '), o.extraCharge||0, o.acFloorNote||'', o.washerFloorNote||'',o.total,o.discount,o.netTotal,o.createdAt||'']);
       const csv=[headers.join(','),...rows.map(r=>r.map(x=>{const s=(x??'').toString();return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;}).join(','))].join('\n');
       download(`訂單_${$('yearSel').value}-${pad2($('monthSel').value)}.csv`, csv);
     }
-    function exportJSON(){ download(`訂單資料備份.json`, JSON.stringify({orders, staffList, contactList}, null, 2)); }
+    function exportJSON(){ download(`訂單資料備份.json`, JSON.stringify({orders, staffList, contactList, extraFields: ['extraCharge','acFloorNote','washerFloorNote']}, null, 2)); }
     function importJSON(){ $('filePicker').click(); }
     $('filePicker')?.addEventListener('change',(e)=>{
       const file=e.target.files[0]; if(!file) return;
@@ -1344,6 +1422,234 @@ th.col-total, td.col-total {
     });
     function addExpCat(){ const name=prompt('輸入新花費類別：')?.trim(); if(!name) return; if(!expCats.includes(name)){ expCats.push(name); save(EXP_CAT_KEY, expCats); initExpenseCats(); } $('expCategory').value=name; }
 
+    
+    // ---------- Reminders (Due Service) ----------
+    const REM_PREF_KEY = 'yl_clean_reminder_prefs_v1';
+    function loadRemPrefs(){
+      const d = load(REM_PREF_KEY, {years:2, leadDays:30, cooldownDays:7, notifications:false});
+      if($('remYears')) $('remYears').value = d.years;
+      if($('leadDays')) $('leadDays').value = d.leadDays;
+      if($('cooldownDays')) $('cooldownDays').value = d.cooldownDays||7;
+      return d;
+    }
+    function saveRemPrefs(){
+      const years = +(($('remYears')&&$('remYears').value)||2);
+      const leadDays = +(($('leadDays')&&$('leadDays').value)||30);
+      const cooldownDays = +( ($('cooldownDays')&&$('cooldownDays').value) || 7 );
+      const prefs = {years: Math.max(1, Math.round(years)), leadDays: Math.max(0, Math.round(leadDays)), cooldownDays: Math.max(0, Math.round(cooldownDays)), notifications: notifEnabled};
+      save(REM_PREF_KEY, prefs);
+      refreshReminders();
+      alert('提醒設定已儲存');
+    }
+    function endOfDay(d){ const x=new Date(d); x.setHours(23,59,59,999); return x; }
+    function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+    function addYears(d,n){ const x=new Date(d); x.setFullYear(x.getFullYear()+n); return x; }
+    function parseISO(s){ try{return s?new Date(s):null;}catch{return null;} }
+    function getOrderDate(o){
+      return parseISO(o.completedAt) || (o.date ? new Date(o.date) : null);
+    }
+    function buildLastServiceMap(orders){
+      const map = new Map();
+      for(const o of orders){
+        const d = getOrderDate(o);
+        if(!d) continue;
+        const key = (o.customer||'') + '|' + (o.address||'');
+        const cur = map.get(key);
+        if(!cur || d > cur.lastDate){
+          map.set(key, { 
+            name: o.customer||'(未填姓名)', phone: o.phone||'', address: o.address||'',
+            lastDate: d, lastItem: o, order: o
+          });
+        }
+      }
+      return map;
+    }
+    function computeReminders(){
+      const prefs = loadRemPrefs();
+
+      const contacts = load(CONTACTS_KEY, []);
+      function matchContact(name, address, phone){
+        const np = (phone||'').replace(/\D+/g,'');
+        let found = contacts.find(c => (c.phone||'').replace(/\D+/g,'') === np && np);
+        if(found) return found;
+        found = contacts.find(c => (c.name||'')===name && (c.address||'')===address);
+        if(found) return found;
+        found = contacts.find(c => (c.name||'')===name);
+        return found || null;
+      }
+
+      const orders = load(KEY, []);
+      const map = buildLastServiceMap(orders);
+      const today = new Date();
+      const list = [];
+      map.forEach((v,key)=>{
+        const contact = matchContact(v.name, v.address, v.phone);
+        const years = (contact && +contact.periodYears>0) ? +contact.periodYears : prefs.years;
+        const due = addYears(v.lastDate, years);
+        const warn = addDays(due, -prefs.leadDays);
+        const status = (today >= endOfDay(due)) ? 'overdue' : (today >= warn ? 'due' : 'ok');
+        if(status!=='ok'){
+          list.push({key, status, due, lastDate: v.lastDate, name: v.name, phone: v.phone, address: v.address, order: v.order});
+        }
+      });
+      list.sort((a,b)=> a.due - b.due);
+      return list;
+    }
+    function renderReminderPanel(){
+      const list = computeReminders();
+      const cont = $('reminderList');
+      const badge = $('reminderCount');
+      if(badge){ badge.textContent = String(list.length); badge.classList.toggle('muted', list.length===0); }
+      if(!cont) return;
+      if(list.length===0){ cont.innerHTML = '<div class="tiny">目前沒有即將到期的客戶。</div>'; return; }
+      cont.innerHTML = list.map(it=>{
+        const d = it.due.toISOString().slice(0,10);
+        const last = it.lastDate.toISOString().slice(0,10);
+        const cls = it.status==='overdue'?'⚠️ 逾期':'⏰ 即將到期';
+        const tel = it.phone ? `<a href="tel:${it.phone}">${it.phone}</a>` : '';
+        return `<div class="reminder-item">
+          <div>
+            <div class="reminder-title">${cls}：${it.name}</div>
+            <div class="tiny">${it.address||''}</div>
+            <div class="tiny">上次：${last}｜到期：${d} ｜週期：${(matchContact(it.name,it.address,it.phone)?.periodYears)||load(REM_PREF_KEY,{years:2,leadDays:30}).years} 年 ${tel?('｜電話：'+tel):''}</div>
+          </div>
+          <div class="toolbar" style="gap:6px">
+            <button type="button" class="inline-btn" onclick="openOrderById('${'${it.order.id||\'\'}'}')">查看</button>
+            <button type="button" class="inline-btn" onclick="createDueCalendar('${'${it.name||\'\'}'}','${'${d}'}','${'${it.address||\'\'}'}')">加到行事曆</button>
+          </div>
+        </div>`
+      }).join('');
+    }
+    function applyDueHighlights(){
+      const list = computeReminders();
+      document.querySelectorAll('#ordersTable tbody tr').forEach(tr=>{
+        tr.classList.remove('overdue','due');
+      });
+      for(const it of list){
+        document.querySelectorAll(`#ordersTable tbody tr[data-customer="${'${it.name}'}"][data-address="${'${it.address}'}"]`).forEach(tr=>{
+          tr.classList.add(it.status==='overdue'?'overdue':'due');
+        });
+      }
+    }
+    function openOrderById(id){
+      const orders = load(KEY, []);
+      const o = orders.find(x=>String(x.id)===String(id));
+      if(!o) return;
+      fillForm(o);
+      document.getElementById('orderAccordion')?.setAttribute('open','');
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+    function createDueCalendar(name, dateISO, location){
+      try{
+        const title = (name||'客戶') + '｜例行保養/清洗到期';
+        const start = new Date(dateISO + 'T09:00:00');
+        const end = new Date(dateISO + 'T10:00:00');
+        const ics = [
+          'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//yl-clean//reminder//TW',
+          'BEGIN:VEVENT',
+          'DTSTART:' + start.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z',
+          'DTEND:' + end.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z',
+          'SUMMARY:' + title,
+          'LOCATION:' + (location||''),
+          'DESCRIPTION:系統到期提醒，自動建立。',
+          'END:VEVENT','END:VCALENDAR'
+        ].join('\r\n');
+        const blob = new Blob([ics], {type:'text/calendar'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (title.replace(/[\s\/]/g,'_')) + '.ics';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }catch(e){ console.error(e); alert('建立行事曆事件失敗'); }
+    }
+    let notifEnabled = false;
+    async function ensureNotification(){
+      try{
+        if(!('Notification' in window)) return false;
+        if(Notification.permission === 'granted') return (notifEnabled=true);
+        if(Notification.permission !== 'denied'){
+          const p = await Notification.requestPermission();
+          notifEnabled = (p==='granted');
+          return notifEnabled;
+        }
+      }catch{}
+      return false;
+    }
+    function maybeNotify(){
+      const prefs = loadRemPrefs();
+      if(!prefs.notifications) return;
+      const list = computeReminders();
+      if(list.length===0) return;
+      const top = list[0];
+      const title = (top.status==='overdue'?'逾期':'即將到期') + '｜' + top.name;
+      const body = (top.address||'') + '｜到期：' + top.due.toISOString().slice(0,10);
+      try{ new Notification(title, {body}); }catch{}
+    }
+    
+    // ---------- Reminder acknowledgements & mute ----------
+    function withContacts(fn){
+      const list = load(CONTACTS_KEY, []);
+      const changed = fn(list) || false;
+      if(changed) save(CONTACTS_KEY, list);
+      return list;
+    }
+    function findContactEntry(list, name, address, phone){
+      const np = (phone||'').replace(/\D+/g,'');
+      let c = list.find(x => (x.phone||'').replace(/\D+/g,'')===np && np);
+      if(c) return c;
+      c = list.find(x => (x.name||'')===name && (x.address||'')===address);
+      if(c) return c;
+      c = list.find(x => (x.name||'')===name);
+      return c || null;
+    }
+    function markNotified(name, address, phone){
+      withContacts(list=>{
+        const c = findContactEntry(list, name, address, phone);
+        if(!c) return false;
+        c.reminder = c.reminder || {};
+        c.reminder.lastNotifiedISO = new Date().toISOString();
+        return true;
+      });
+      refreshReminders();
+    }
+    function ignoreThisCycle(name, address, phone, dueISO){
+      withContacts(list=>{
+        const c = findContactEntry(list, name, address, phone);
+        if(!c) return false;
+        c.reminder = c.reminder || {};
+        c.reminder.lastAckDueISO = dueISO;
+        const years = +(c.periodYears||load(REM_PREF_KEY,{years:2}).years)||2;
+        const d = new Date(dueISO); d.setFullYear(d.getFullYear()+years);
+        c.reminder.nextDueOverrideISO = d.toISOString();
+        return true;
+      });
+      refreshReminders();
+    }
+    function muteContact(name, address, phone){
+      withContacts(list=>{
+        const c = findContactEntry(list, name, address, phone);
+        if(!c) return false;
+        c.reminder = c.reminder || {};
+        c.reminder.muted = true;
+        return true;
+      });
+      refreshReminders();
+    }
+    function unmuteContact(name, address, phone){
+      withContacts(list=>{
+        const c = findContactEntry(list, name, address, phone);
+        if(!c || !c.reminder) return false;
+        c.reminder.muted = false;
+        return true;
+      });
+      refreshReminders();
+    }
+
+function refreshReminders(){
+      renderReminderPanel();
+      applyDueHighlights();
+    }
+
     // ---------- Events ----------
     function attachEvents(){
       // order form
@@ -1351,7 +1657,17 @@ th.col-total, td.col-total {
       $('deleteBtn').addEventListener('click', deleteOrder);
       $('resetBtn').addEventListener('click', resetForm);
       $('recalc').addEventListener('click', recalcTotals);
-      ['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount']
+      
+      $('saveRemPrefs')?.addEventListener('click', saveRemPrefs);
+      $('pushNotify')?.addEventListener('click', async ()=>{
+        const ok = await ensureNotification();
+        if(ok){ const prefs = load(REM_PREF_KEY, {years:2,leadDays:30,notifications:false}); prefs.notifications=true; save(REM_PREF_KEY, prefs); alert('已開啟桌面通知'); maybeNotify(); }
+        else { alert('您的瀏覽器不支援或未允許通知'); }
+      });
+      loadRemPrefs();
+      setTimeout(refreshReminders, 0);
+      setInterval(refreshReminders, 60*60*1000);
+['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount']
         .forEach(id => $(id).addEventListener('input', recalcTotals));
       $('newBtn').addEventListener('click', ()=>{ fillForm({}); });
 $('exportJson').addEventListener('click', exportJSON);
@@ -1363,11 +1679,11 @@ $('importJson').addEventListener('click', importJSON);
       // Autofill from contacts when name/phone entered
       $('customer').addEventListener('blur', ()=>{
         const c = findContactByName($('customer').value);
-        if(c){ $('phone').value = c.phone||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
+        if(c){ if($('customerPeriodYears')) $('customerPeriodYears').value = c.periodYears || ''; $('phone').value = c.phone||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
       });
       $('phone').addEventListener('blur', ()=>{
         const c = findContactByPhone($('phone').value);
-        if(c){ if(!$('customer').value) $('customer').value = c.name||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
+        if(c){ if($('customerPeriodYears')) $('customerPeriodYears').value = c.periodYears || ''; if(!$('customer').value) $('customer').value = c.name||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
       });
 
 
@@ -1479,7 +1795,32 @@ $('importJson').addEventListener('click', importJSON);
       initYearMonth(); initStaffSelects(); initContactSelect(); initCheckboxes(); initExpenseCats();
       attachEvents(); refreshContactsDatalist(); fillForm({}); fillExpForm({}); refreshTable(); refreshExpense();
     })();
-  </script>
+  
+
+
+    // === 顯示或隱藏樓層手動輸入框 ===
+    function bindFloorInputToggle() {
+      const acInputs = document.querySelectorAll('input[data-name="acFloor"]');
+      const washerInputs = document.querySelectorAll('input[data-name="washerFloor"]');
+      const acNote = document.getElementById('acFloorNote');
+      const washerNote = document.getElementById('washerFloorNote');
+
+      function toggleNote(inputs, noteEl) {
+        if (!noteEl) return;
+        const checked = Array.from(inputs).some(i => i.checked && i.value === '5樓以上');
+        noteEl.classList.toggle('hidden', !checked);
+      }
+
+      acInputs.forEach(i => i.addEventListener('change', () => toggleNote(acInputs, acNote)));
+      washerInputs.forEach(i => i.addEventListener('change', () => toggleNote(washerInputs, washerNote)));
+
+      // 初始也觸發一次
+      toggleNote(acInputs, acNote);
+      toggleNote(washerInputs, washerNote);
+    }
+
+    document.addEventListener('DOMContentLoaded', bindFloorInputToggle);
+    </script>
 <script>
 /* ===== Offline .xlsx exporter (no external deps) =====
    Builds a minimal XLSX (2 sheets) using uncompressed ZIP.
@@ -1966,357 +2307,7 @@ op.appendChild(calBtn);
 </script>
 <!-- ✅ 表單中新增：工作時長欄位 -->
 <!-- ✅ gatherForm() 中補上 -->
-</div>
-<!-- BEGIN: Reminder Engine (外置區塊 + 自訂週期；不動 Google 相關程式) -->
-<script>
-(function(){
-  // ---- Helpers ----
-  function $(id){ return document.getElementById(id); }
-  function addMonths(dateStr, months){
-    if(!dateStr) return '';
-    const d = new Date(dateStr + 'T00:00:00');
-    d.setMonth(d.getMonth() + (months||0));
-    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), da = String(d.getDate()).padStart(2,'0');
-    return `${y}-${m}-${da}`;
-  }
-  function daysDiff(fromDateStr, toDateStr){
-    if(!fromDateStr || !toDateStr) return NaN;
-    const a = new Date(fromDateStr + 'T00:00:00').getTime();
-    const b = new Date(toDateStr + 'T00:00:00').getTime();
-    return Math.floor((b - a) / (24*60*60*1000));
-  }
-  const REMIND_SOON_DAYS = 30;
-
-  // ---- Contacts storage (不依賴全域 contacts 陣列，直接用 localStorage，避免衝突) ----
-  const CONTACTS_KEY = (window.CONTACTS_KEY || 'yl_clean_contacts_v1');
-  function loadContacts(){ try{ return JSON.parse(localStorage.getItem(CONTACTS_KEY)||'[]'); }catch(_){ return []; } }
-  function saveContacts(list){ localStorage.setItem(CONTACTS_KEY, JSON.stringify(list)); }
-  function normalizePhone(p){ return (p||'').replace(/\D+/g,''); }
-
-  function upsertContactExtra(name, phone, address, lineId, extra){
-    const list = loadContacts();
-    const np = normalizePhone(phone);
-    const base = { lastCleanDate:'', cycleMonths:24, nextDueDate:'', mute:false, snoozeUntil:'', lastNotified:'' };
-    let idx = -1;
-    if(np) idx = list.findIndex(c=> normalizePhone(c.phone)===np);
-    if(idx>=0){
-      list[idx] = Object.assign({}, base, list[idx], {
-        name: list[idx].name || name,
-        phone: list[idx].phone || phone,
-        address: list[idx].address || address,
-        lineId: list[idx].lineId || lineId
-      }, extra||{});
-    }else{
-      list.push(Object.assign({
-        id: (crypto&&crypto.randomUUID)? crypto.randomUUID(): String(Date.now())+Math.random(),
-        name: name||'', phone: phone||'', address: address||'', lineId: lineId||''
-      }, base, extra||{}));
-    }
-    saveContacts(list);
-  }
-
-  // ---- Compute & render reminder cards ----
-  // ---- One-time migration & backfill ----
-  function recalcMissingNextDue(){
-    const list = loadContacts();
-    let changed = 0;
-    list.forEach(c => {
-      if (!c.nextDueDate && c.lastCleanDate && (c.cycleMonths || c.cycleMonths === 0)) {
-        const cm = +c.cycleMonths || 24;
-        c.nextDueDate = addMonths(c.lastCleanDate, cm);
-        changed++;
-      }
-    });
-    if (changed) saveContacts(list);
-    return changed;
-  }
-
-  function migrateContactsFromOrdersOnce(){
-    try{
-      const FLAG = 'yl_contacts_migrated_v1';
-      if(localStorage.getItem(FLAG)) return 0;
-      const orders = JSON.parse(localStorage.getItem('yl_clean_orders_v1')||'[]');
-      let changed = 0;
-      orders.forEach(o=>{
-        if(!o) return;
-        // 只取已完成且有日期的訂單
-        if(o.status==='完成' && o.date){
-          const cm = +(document.getElementById('cycleMonths')?.value || 24);
-          const nextDue = addMonths(o.date, cm);
-          upsertContactExtra(o.customer, o.phone, o.address, o.lineId, {
-            lastCleanDate: o.date,
-            cycleMonths: cm,
-            nextDueDate: nextDue
-          });
-          changed++;
-        }
-      });
-      localStorage.setItem(FLAG, '1');
-      return changed;
-    }catch(_){ return 0; }
-  }
-
-  function isSnoozed(c){
-    if(!c || !c.snoozeUntil) return false;
-    const today = new Date().toISOString().slice(0,10);
-    return c.snoozeUntil >= today;
-  }
-  function computeBuckets(){
-    const list = loadContacts();
-    const todayStr = new Date().toISOString().slice(0,10);
-    const due = [], soon = [];
-    list.forEach(c=>{
-      if(c.mute===true) return;           // 不再提醒 → 排除
-      if(isSnoozed(c)) return;            // 暫停期間 → 排除
-      if(!c || !c.nextDueDate) return;
-      const d = daysDiff(todayStr, c.nextDueDate);
-      if(isNaN(d)) return;
-      if(d<=0) due.push(Object.assign({days:d}, c));
-      else if(d<=REMIND_SOON_DAYS) soon.push(Object.assign({days:d}, c));
-    });
-    // sort by nextDueDate
-    due.sort((a,b)=> (a.nextDueDate||'').localeCompare(b.nextDueDate||''));
-    soon.sort((a,b)=> (a.nextDueDate||'').localeCompare(b.nextDueDate||''));
-    return { due, soon };
-  }
-
-  function renderReminderSection(){
-    const sec = $('reminderSection'); if(!sec) return;
-    const sum = $('reminderSummary');
-    const list = $('reminderList');
-    let { due, soon } = computeBuckets();
-    const filterSel = document.getElementById('reminderFilter');
-    const mode = filterSel ? filterSel.value : 'active';
-    // Re-load full list for filtered views that include muted/snoozed
-    const allList = (function(){ try{return JSON.parse(localStorage.getItem(CONTACTS_KEY)||'[]');}catch(_){return [];} })();
-    if(mode==='muted'){
-      due = allList.filter(c=>c.mute===true);
-      soon = [];
-    } else if(mode==='snoozed'){
-      const today = new Date().toISOString().slice(0,10);
-      due = allList.filter(c=>c.snoozeUntil && c.snoozeUntil>=today);
-      soon = [];
-    } else if(mode==='all'){
-      // Show active due/soon plus muted/snoozed appended
-      const today = new Date().toISOString().slice(0,10);
-      const muted = allList.filter(c=>c.mute===true).map(c=>Object.assign({labelOverride:'不再提醒'}, c));
-      const snoozed = allList.filter(c=>c.snoozeUntil && c.snoozeUntil>=today).map(c=>Object.assign({labelOverride:'暫停中'}, c));
-      // Keep active buckets, append others to 'soon' bucket for display
-      soon = soon.concat(snoozed, muted);
-    }
-
-    if(sum){
-      sum.innerHTML = '';
-      const mk = (t,v,h='')=>{ const box=document.createElement('div'); box.className='box'; box.innerHTML = `<div class="small muted">${t}</div><div class="number">${v}</div>${h?`<div class="small muted">${h}</div>`:''}`; return box; };
-      sum.appendChild(mk('到期', due.length));
-      sum.appendChild(mk(`${REMIND_SOON_DAYS}天內`, soon.length));
-      sum.appendChild(mk('提醒總數', due.length + soon.length));
-    }
-
-    if(list){
-    // Empty-state hint
-    if ((due.length + soon.length) === 0 && sum) {
-      const stats = computeReminderStats();
-      const hint = document.createElement('div');
-      hint.className = 'small muted';
-      hint.style.marginTop = '6px';
-      hint.innerHTML = `（沒有可顯示的提醒）<br>
-        總客戶 ${stats.total}，缺少下次到期 ${stats.missingNextDue}，已靜音 ${stats.muted}，暫停中 ${stats.snoozed}。
-        <br>提示：只有 <b>有 nextDueDate</b> 且 <b>未靜音/未暫停</b> 的客戶才會出現在這裡；
-        已到期與 ${stats.soonWindowDays}天內將分別顯示在兩個列表中。`;
-      sum.appendChild(hint);
-    }
-
-
-      const row = (c,label,idx)=> `<tr data-phone="${c.phone||''}">
-  <td>${label}</td>
-  <td><label><input type="checkbox" class="remSel" data-phone="${c.phone||''}"> ${c.name||''}</label></td>
-  <td>${c.phone||''}</td>
-  <td>${c.address||''}</td>
-  <td>${c.lastCleanDate||''}</td>
-  <td>${c.cycleMonths||''}</td>
-  <td>${c.nextDueDate||''}</td>
-  <td>
-    <button class="remAction" data-act="notified" data-phone="${c.phone||''}">已通知</button>
-    <button class="remAction" data-act="snooze7" data-phone="${c.phone||''}">暫停7天</button>
-    <button class="remAction" data-act="snooze30" data-phone="${c.phone||''}">暫停30天</button>
-    <button class="remAction" data-act="mute" data-phone="${c.phone||''}">不再提醒</button>
-    <button class="remAction" data-act="unmute" data-phone="${c.phone||''}">恢復</button>
-  </td>
-</tr>`;
-      list.innerHTML = `
-        <table style="width:100%;border-collapse:collapse">
-          <thead><tr><th>狀態</th><th>客戶</th><th>電話</th><th>地址</th><th>上次清洗</th><th>週期(月)</th><th>下次到期</th><th>操作</th></tr></thead>
-          <tbody>
-            ${due.map((c,i)=>row(c, c.labelOverride||'到期', i)).join('')}
-            ${soon.map((c,i)=>row(c, c.labelOverride||'即將到期', i)).join('')}
-          </tbody>
-        </table>`;
-      bindReminderActions();
-    }
-  }
-
-  // --- Actions / utilities ---
-  function updateContactByPhone(phone, updater){
-    const list = loadContacts();
-    const idx = list.findIndex(c => (c.phone||'') === phone);
-    if(idx>=0){
-      updater(list[idx]);
-      saveContacts(list);
-    }
-  }
-  function todayStr(){ return new Date().toISOString().slice(0,10); }
-
-  function bindReminderActions(){
-    const container = document.getElementById('reminderList');
-    if(!container) return;
-    // Row action buttons
-    container.querySelectorAll('.remAction').forEach(btn=>{
-      btn.addEventListener('click', function(){
-        const act = this.getAttribute('data-act');
-        const phone = this.getAttribute('data-phone');
-        if(!phone) return;
-        if(act==='notified'){
-          updateContactByPhone(phone, c => { c.lastNotified = todayStr(); });
-        }else if(act==='snooze7'){
-          updateContactByPhone(phone, c => { c.snoozeUntil = addMonths(todayStr(), 0); c.snoozeUntil = new Date(Date.now()+7*86400000).toISOString().slice(0,10); });
-        }else if(act==='snooze30'){
-          updateContactByPhone(phone, c => { c.snoozeUntil = new Date(Date.now()+30*86400000).toISOString().slice(0,10); });
-        }else if(act==='mute'){
-          updateContactByPhone(phone, c => { c.mute = true; });
-        }else if(act==='unmute'){
-          updateContactByPhone(phone, c => { c.mute = false; c.snoozeUntil=''; });
-        }
-        renderReminderSection();
-      });
-    });
-    // Bulk controls
-    const bulkSnooze = document.getElementById('bulkSnooze');
-    if(bulkSnooze){
-      bulkSnooze.onchange = function(){
-        const days = parseInt(this.value||'0',10);
-        if(!days) return;
-        const sel = [...container.querySelectorAll('.remSel:checked')].map(cb=>cb.getAttribute('data-phone'));
-        sel.forEach(phone=> updateContactByPhone(phone, c=>{ c.snoozeUntil = new Date(Date.now()+days*86400000).toISOString().slice(0,10);}));
-        this.value = '';
-        renderReminderSection();
-      };
-    }
-    const bulkUnmute = document.getElementById('bulkUnmute');
-    if(bulkUnmute){
-      bulkUnmute.onclick = function(){
-        const sel = [...container.querySelectorAll('.remSel:checked')].map(cb=>cb.getAttribute('data-phone'));
-        sel.forEach(phone=> updateContactByPhone(phone, c=>{ c.mute=false; c.snoozeUntil=''; }));
-        renderReminderSection();
-      };
-    }
-    const filterSel = document.getElementById('reminderFilter');
-    if(filterSel){
-      filterSel.onchange = renderReminderSection;
-    }
-  }
-  // ---- Inject a small "保養週期(月)" input into the order form toolbar (右側) ----
-  function ensureCycleInput(){
-    if(document.getElementById('cycleMonths')) return; // already exists
-    const right = document.querySelector('#orderForm .toolbar .right');
-    if(!right) return;
-    const wrap = document.createElement('div');
-    wrap.style.display='inline-block';
-    wrap.style.marginRight='8px';
-    wrap.innerHTML = '<label style="margin-right:4px;">保養週期(月)</label><input id="cycleMonths" type="number" min="1" step="1" value="24" style="width:80px">';
-    right.prepend(wrap);
-  }
-
-  // ---- Non-invasive saveOrder hook：先擷取表單資料，再呼叫原本的 saveOrder，最後刷新提醒 ----
-  const originalSaveOrder = window.saveOrder;
-  window.saveOrder = function(e){
-    // 預先擷取表單資料（原本 saveOrder 儲存後會清表單）
-    let data = {};
-    try{ if(typeof window.gatherForm==='function') data = window.gatherForm() || {}; }catch(_){ data = {}; }
-    const cm = +(document.getElementById('cycleMonths')?.value || 24);
-
-    // 呼叫原本邏輯
-    let ret;
-    if(typeof originalSaveOrder === 'function'){
-      ret = originalSaveOrder.apply(this, arguments);
-    }
-
-    // 若本次為「完成」且有日期，更新該客戶的到期欄位
-    try{
-      if(data && data.status==='完成' && data.date){
-        const nextDue = addMonths(data.date, cm);
-        upsertContactExtra(data.customer, data.phone, data.address, data.lineId, {
-          lastCleanDate: data.date,
-          cycleMonths: cm,
-          nextDueDate: nextDue
-        });
-      }else if(data){
-        // 至少記住週期設定
-        upsertContactExtra(data.customer, data.phone, data.address, data.lineId, { cycleMonths: cm });
-      }
-    }catch(_){ /* ignore */ }
-
-    // 重新渲染提醒卡片
-    renderReminderSection();
-    return ret;
-  };
-
-  attachDiagnosticsButton();
-    document.addEventListener('DOMContentLoaded', function(){
-    ensureCycleInput();
-    migrateContactsFromOrdersOnce();
-    recalcMissingNextDue();
-    renderReminderSection();
-  });
-}
-
-  // ---- Diagnostics ----
-  function computeReminderStats(){
-    const all = loadContacts();
-    const today = new Date().toISOString().slice(0,10);
-    const stats = {
-      total: all.length,
-      muted: 0,
-      snoozed: 0,
-      missingNextDue: 0,
-      due: 0,
-      soon: 0,
-      soonWindowDays: REMIND_SOON_DAYS
-    };
-    all.forEach(c=>{
-      if(!c || !c.nextDueDate) { stats.missingNextDue++; return; }
-      if(c.mute===true) { stats.muted++; return; }
-      if(isSnoozed(c)) { stats.snoozed++; return; }
-      const d = daysDiff(today, c.nextDueDate);
-      if(isNaN(d)) return;
-      if(d<=0) stats.due++;
-      else if(d<=REMIND_SOON_DAYS) stats.soon++;
-    });
-    return stats;
-  }
-
-  function attachDiagnosticsButton(){
-    const btn = document.getElementById('remDiagBtn');
-    if(!btn) return;
-    btn.onclick = function(){
-      const stats = computeReminderStats();
-      console.table(stats);
-      alert(
-        '提醒診斷\n' +
-        `總客戶: ${stats.total}\n` +
-        `缺少下次到期: ${stats.missingNextDue}\n` +
-        `已靜音: ${stats.muted}\n` +
-        `暫停中: ${stats.snoozed}\n` +
-        `已到期: ${stats.due}\n` +
-        `${stats.soonWindowDays}天內: ${stats.soon}`
-      );
-    };
-  }
-)();
-</script>
-<!-- END: Reminder Engine (外置區塊 + 自訂週期；不動 Google 相關程式) -->
-
-</body>
+</div></body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
