@@ -41,28 +41,37 @@ function isValidTwMobile(p){
   return /^09\d{8}$/.test(digits);
 }
     function upsertContact(name, phone, address, lineId){
-      const np = normalizePhone(phone);
-      if(!name && !np) return;
-      const idx = contacts.findIndex(c => normalizePhone(c.phone)===np && np);
-      if(idx>=0){
-        // merge
-        contacts[idx].name = contacts[idx].name || name;
-        contacts[idx].address = contacts[idx].address || address;
-        contacts[idx].lineId = contacts[idx].lineId || lineId;
-      }else{
-        contacts.push({id: crypto.randomUUID(), name: name||'', phone: phone||'', address: address||'', lineId: lineId||''});
-      }
-      save(CONTACTS_KEY, contacts);
-      refreshContactsDatalist();
-    }
-    function findContactByName(name){
+  const np = normalizePhone(phone);
+  const lid = (lineId||'').trim();
+  if(!name && !np && !lid) return;
+  let idx = -1;
+  if (np) idx = contacts.findIndex(c => normalizePhone(c.phone)===np);
+  if (idx < 0 && lid) idx = contacts.findIndex(c => (c.lineId||'').trim()===lid);
+  if(idx>=0){
+    // merge
+    contacts[idx].name = contacts[idx].name || name;
+    contacts[idx].address = contacts[idx].address || address;
+    if(lid) contacts[idx].lineId = contacts[idx].lineId || lineId;
+    if(np) contacts[idx].phone = contacts[idx].phone || phone;
+  } else {
+    contacts.push({id: crypto.randomUUID(), name: name||'', phone: phone||'', address: address||'', lineId: lineId||''});
+  }
+  save(CONTACTS_KEY, contacts);
+  refreshContactsDatalist();
+}
+function findContactByName(name){
       const n=(name||'').trim();
       if(!n) return null;
       const list = contacts.filter(c => (c.name||'')===n);
       if(list.length===1) return list[0];
       return null;
     }
-    function findContactByPhone(phone){
+    function findContactByLineId(lineId){
+  const lid = (lineId||'').trim();
+  if(!lid) return null;
+  return contacts.find(c => (c.lineId||'').trim()===lid) || null;
+}
+function findContactByPhone(phone){
       const np = normalizePhone(phone);
       if(!np) return null;
       return contacts.find(c => normalizePhone(c.phone)===np) || null;
@@ -577,18 +586,20 @@ function gatherForm(){
     function saveOrder(e){
       e.preventDefault();
       
-      // Taiwan mobile validation
-      const phoneVal = $('phone')?.value || '';
-      if(!isValidTwMobile(phoneVal)){
+      
+      // Contact validation: phone optional; LINE 可替代
+      const phoneVal = $('phone')?.value?.trim() || '';
+      const lineVal = $('lineId')?.value?.trim() || '';
+      if (phoneVal && !isValidTwMobile(phoneVal)){
         if (typeof Swal !== 'undefined' && Swal.fire){
-          Swal.fire('電話格式不正確', '請輸入台灣手機，例如：0912345678 或 0912-345-678', 'warning');
+          Swal.fire('電話格式不正確', '請輸入台灣手機（0912345678 或 0912-345-678），或改填 LINE 聯絡方式', 'warning');
         } else {
-          alert('電話格式不正確，請輸入 0912345678 或 0912-345-678');
+          alert('電話格式不正確，請輸入 0912345678 或 0912-345-678，或改填 LINE 聯絡方式');
         }
         $('phone')?.focus();
         return;
       }
-    recalcTotals();
+recalcTotals();
       const data=gatherForm(); // 日期可留空
       // handle completedAt & lock
       if(data.status==='完成'){
@@ -715,6 +726,14 @@ $('importJson').addEventListener('click', importJSON);
       $('customer').addEventListener('blur', ()=>{
         const c = findContactByName($('customer').value);
         if(c){ $('phone').value = c.phone||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
+      });
+      $('phone').addEventListener('blur', ()=>{
+        const c2 = findContactByLineId($('lineId').value);
+        if(c2){ if(!$('customer').value) $('customer').value = c2.name||''; if(!$('address').value) $('address').value = c2.address||''; if(!$('phone').value) $('phone').value = c2.phone||''; }
+      });
+      $('lineId').addEventListener('blur', ()=>{
+        const c3 = findContactByLineId($('lineId').value);
+        if(c3){ if(!$('customer').value) $('customer').value = c3.name||''; if(!$('address').value) $('address').value = c3.address||''; if(!$('phone').value) $('phone').value = c3.phone||''; }
       });
       $('phone').addEventListener('blur', ()=>{
         const c = findContactByPhone($('phone').value);
