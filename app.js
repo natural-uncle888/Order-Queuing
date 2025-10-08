@@ -913,15 +913,21 @@ $('importJson').addEventListener('click', importJSON);
       // Autofill from contacts when name/phone entered
       $('customer').addEventListener('blur', ()=>{
         const c = findContactByName($('customer').value);
-        if(c){ $('phone').value = c.phone||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
+        if(c){ if ($('phone').dataset.touched !== '1' && !$('phone').value) $('phone').value = c.phone || ''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
       });
-      $('phone').addEventListener('blur', ()=>{
+      // ---- phone touched guard (so user can keep it empty) ----
+try {
+  $('phone').dataset.touched = $('phone').dataset.touched || '0';
+  $('phone').addEventListener('input', ()=>{ $('phone').dataset.touched = '1'; });
+} catch(e) { /* ignore if element missing */ }
+// ---------------------------------------------------------
+$('phone').addEventListener('blur', ()=>{
         const c2 = findContactByLineId($('lineId').value);
-        if(c2){ if(!$('customer').value) $('customer').value = c2.name||''; if(!$('address').value) $('address').value = c2.address||''; if(!$('phone').value) $('phone').value = c2.phone||''; }
+        if(c2){ if(!$('customer').value) $('customer').value = c2.name||''; if(!$('address').value) $('address').value = c2.address||''; if ($('phone').dataset.touched !== '1' && !$('phone').value) $('phone').value = c2.phone || ''; }
       });
       $('lineId').addEventListener('blur', ()=>{
         const c3 = findContactByLineId($('lineId').value);
-        if(c3){ if(!$('customer').value) $('customer').value = c3.name||''; if(!$('address').value) $('address').value = c3.address||''; if(!$('phone').value) $('phone').value = c3.phone||''; }
+        if(c3){ if(!$('customer').value) $('customer').value = c3.name||''; if(!$('address').value) $('address').value = c3.address||''; if ($('phone').dataset.touched !== '1' && !$('phone').value) $('phone').value = c3.phone || ''; }
       });
       $('phone').addEventListener('blur', ()=>{
         const c = findContactByPhone($('phone').value);
