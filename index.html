@@ -359,36 +359,37 @@ th.col-total, td.col-total {
 </div>
 </header>
 <main class="wrap stack" style="margin-top:16px">
-<!-- BEGIN: 保養提醒（獨立卡片，置於訂單列表之前） -->
+<!-- BEGIN: 保養提醒（獨立卡片，位於訂單列表之前） -->
 <section class="card" id="reminderSection">
   <h2>保養提醒</h2>
   <div class="body">
-    <div class="toolbar" id="reminderControls" style="gap:8px;flex-wrap:wrap">
-      <div class="pill"><strong>篩選</strong>
-        <select id="reminderFilter">
-          <option value="active">僅顯示有效提醒</option>
-          <option value="all">顯示全部（含靜音/暫停）</option>
-          <option value="muted">只看不再提醒</option>
-          <option value="snoozed">只看暫停中</option>
-        </select>
-      </div>
-      <div class="pill"><strong>快速暫停</strong>
-        <select id="bulkSnooze">
-          <option value="">— 對選取的顧客 —</option>
-          <option value="7">暫停 7 天</option>
-          <option value="30">暫停 30 天</option>
-          <option value="90">暫停 90 天</option>
-        </select>
-      </div>
-      <div class="pill">
-        <button id="bulkUnmute" type="button">恢復提醒</button>
-      </div>
-    </div>
+    <div id="reminderSummary" class="sum"></div>
     <div class="hr"></div>
-    <div id="reminderList"></div>
+    <div id="reminderList" style="overflow:auto">
+<div class="toolbar" id="reminderControls" style="display:flex;gap:12px;align-items:center;margin:8px 0">
+  <div class="pill"><strong>篩選</strong>
+    <select id="reminderFilter">
+      <option value="active">僅顯示有效提醒</option>
+      <option value="all">顯示全部（含靜音/暫停）</option>
+      <option value="muted">只看不再提醒</option>
+      <option value="snoozed">只看暫停中</option>
+    </select>
+  </div>
+  <div class="pill"><strong>快速暫停</strong>
+    <select id="bulkSnooze">
+      <option value="">— 對選取的顧客 —</option>
+      <option value="7">暫停 7 天</option>
+      <option value="30">暫停 30 天</option>
+      <option value="90">暫停 90 天</option>
+    </select>
+  </div>
+  <div class="pill">
+    <button id="bulkUnmute" type="button">恢復提醒</button>
+  </div>
+</div></div>
   </div>
 </section>
-<!-- END: 保養提醒（獨立卡片，置於訂單列表之前） -->
+<!-- END: 保養提醒（獨立卡片，位於訂單列表之前） -->
 
 <!-- 訂單列表（上） -->
 <section class="card">
@@ -615,7 +616,7 @@ th.col-total, td.col-total {
 <button id="resetBtn" type="button">清空表單</button>
 <button id="copyLastBtn" type="button">複製上一筆</button>
 <button id="copyFromHistoryBtn" type="button">從客戶舊單帶入</button>
-<div class="right"><div class="pill" id="cycleMonthsWrap"><strong>保養週期(月)</strong> <input id="cycleMonths" type="number" min="1" step="1" value="24" style="width:80px"></div>
+<div class="right">
 <span class="lock-badge" id="lockInfo"></span>
 <div style="display:inline-block; margin-right:8px;"><label style="margin-right:4px;">時長(分)</label><input id="durationMinutes" min="15" step="15" style="width:70px;" type="number" value="120"/></div><button class="btn" onclick="handleUploadWithAuth(gatherForm())">📅</button><button class="warn" id="toggleLock" type="button">解鎖金額編輯</button>
 <button class="danger" disabled="" id="deleteBtn" type="button">刪除此訂單</button>
@@ -805,60 +806,13 @@ th.col-total, td.col-total {
       const ozoneTotal=ozone*200, transformerTotal=transformerCount*500, longSplitTotal=longSplitCount*300, onePieceTotal=onePieceTray*500;
       return Math.max(0, Math.round(splitTotal+ductTotal+washerTotal+tankTotal+pipesTotal+antiMoldTotal+ozoneTotal+transformerTotal+longSplitTotal+onePieceTotal));
     }
-    
-// 台灣手機格式驗證
-function isValidTaiwanPhone(phone) {
-  return /^09\d{2}-?\d{3}-?\d{3}$/.test(phone);
-}
-
-// 價格設定常數
-const PRICING = {
-  acSplit: { base: 1800, threshold: 3, discount: 1500 },
-  acDuct: { base: 2800 },
-  washerTop: { base: 2000, combo: 1800 },
-  waterTank: { base: 1000 },
-  pipesAmount: { custom: true },
-  antiMold: { base: 300, threshold: 5, discount: 250 },
-  ozone: { base: 200 },
-  transformer: { extra: 500 },
-  longSplit: { extra: 300 },
-  onePieceTray: { extra: 500 },
-};
-
-// 更新後的計價函式
-function calcTotal(f){
-  const a = f;
-  const split = a.acSplit >= PRICING.acSplit.threshold ? PRICING.acSplit.discount : PRICING.acSplit.base;
-  const washer = (a.acSplit + a.acDuct) > 0 ? PRICING.washerTop.combo : PRICING.washerTop.base;
-  const antiMold = a.antiMold >= PRICING.antiMold.threshold ? PRICING.antiMold.discount : PRICING.antiMold.base;
-
-  return Math.max(0, Math.round(
-    a.acSplit * split +
-    a.acDuct * PRICING.acDuct.base +
-    a.washerTop * washer +
-    a.waterTank * PRICING.waterTank.base +
-    Math.max(0, a.pipesAmount) +
-    a.antiMold * antiMold +
-    a.ozone * PRICING.ozone.base +
-    a.transformerCount * PRICING.transformer.extra +
-    a.longSplitCount * PRICING.longSplit.extra +
-    a.onePieceTray * PRICING.onePieceTray.extra
-  ));
-}
-
-function gatherForm(){
-      const phoneVal = $('phone').value.trim();
-      if (!isValidTaiwanPhone(phoneVal)) {
-        alert('請輸入有效的台灣手機號碼，例如 0912-345-678');
-        throw new Error('無效手機格式');
-      }
-
+    function gatherForm(){
       return {
     durationMinutes: +$('durationMinutes').value || 120,
         id: $('id').value || crypto.randomUUID(),
         staff:$('staff').value, date:$('date').value, time:$('time').value,
         confirmed:$('confirmed')?.checked||false, quotationOk:$('quotationOk')?.checked||false,
-        customer:$('customer').value.trim(), lineId:$('lineId').value.trim(), phone: phoneVal,
+        customer:$('customer').value.trim(), lineId:$('lineId').value.trim(), phone:$('phone').value.trim(),
         slots:getChecked('slot'), slotNote:$('slotNote')?.value.trim()||'', address:$('address').value.trim(),
         residenceType:$('residenceType')?.value||'', residenceOther:$('residenceOther')?.value.trim()||'',
         contactTimes:getChecked('contactTime'), contactTimeNote:$('contactTimeNote')?.value.trim()||'',
@@ -1373,13 +1327,7 @@ function gatherForm(){
         tbody.appendChild(tr);
       });
 }
-    function gatherExpForm(){ const phoneVal = $('phone').value.trim();
-      if (!isValidTaiwanPhone(phoneVal)) {
-        alert('請輸入有效的台灣手機號碼，例如 0912-345-678');
-        throw new Error('無效手機格式');
-      }
-
-      return { id:$('expId').value || crypto.randomUUID(), date:$('expDate').value, category:$('expCategory').value, note:$('expNote').value.trim(), amount:+$('expAmount').value||0, createdAt:$('expId').value?undefined:new Date().toISOString() }; }
+    function gatherExpForm(){ return { id:$('expId').value || crypto.randomUUID(), date:$('expDate').value, category:$('expCategory').value, note:$('expNote').value.trim(), amount:+$('expAmount').value||0, createdAt:$('expId').value?undefined:new Date().toISOString() }; }
     function fillExpForm(e){ $('expId').value=e.id||''; $('expDate').value=e.date||''; $('expCategory').value=e.category||expCats[0]; $('expNote').value=e.note||''; $('expAmount').value=e.amount||0; $('expDelete').disabled=!e.id; }
     function saveExpense(ev){ ev.preventDefault(); const data=gatherExpForm(); if(!data.date){ alert('請輸入日期'); return; } const i=expenses.findIndex(x=>x.id===data.id); if(i>=0){ expenses[i]={...expenses[i], ...data}; } else { expenses.push(data); } save(EXP_KEY, expenses); fillExpForm({}); refreshExpense(); }
     function deleteExpense(){ const id=$('expId').value; if(!id) return; if(confirm('確定要刪除這筆花費嗎？')){ expenses=expenses.filter(x=>x.id!==id); save(EXP_KEY, expenses); fillExpForm({}); refreshExpense(); } }
@@ -1821,30 +1769,12 @@ function initGoogleBackup() {
   tokenClient.requestAccessToken();
 }
 function extractCityDistrict(address) {
-  if (!address) const phoneVal = $('phone').value.trim();
-      if (!isValidTaiwanPhone(phoneVal)) {
-        alert('請輸入有效的台灣手機號碼，例如 0912-345-678');
-        throw new Error('無效手機格式');
-      }
-
-      return { city: '', district: '' };
+  if (!address) return { city: '', district: '' };
   const match = address.match(/^(.*?[市縣])\s*([\u4e00-\u9fa5]{1,4}[區鄉鎮市])/);
   if (match) {
-    const phoneVal = $('phone').value.trim();
-      if (!isValidTaiwanPhone(phoneVal)) {
-        alert('請輸入有效的台灣手機號碼，例如 0912-345-678');
-        throw new Error('無效手機格式');
-      }
-
-      return { city: match[1], district: match[2] };
+    return { city: match[1], district: match[2] };
   }
-  const phoneVal = $('phone').value.trim();
-      if (!isValidTaiwanPhone(phoneVal)) {
-        alert('請輸入有效的台灣手機號碼，例如 0912-345-678');
-        throw new Error('無效手機格式');
-      }
-
-      return { city: '', district: '' };
+  return { city: '', district: '' };
 }
 function getOrderItems(o) {
   let items = [];
@@ -2037,14 +1967,11 @@ op.appendChild(calBtn);
 <!-- ✅ 表單中新增：工作時長欄位 -->
 <!-- ✅ gatherForm() 中補上 -->
 </div>
-<!-- BEGIN: Reminder Engine (accordion + controls; 不動 Google) -->
+<!-- BEGIN: Reminder Engine (外置區塊 + 自訂週期；不動 Google 相關程式) -->
 <script>
 (function(){
+  // ---- Helpers ----
   function $(id){ return document.getElementById(id); }
-  function addDays(dateStr, days){
-    const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate()+days);
-    return d.toISOString().slice(0,10);
-  }
   function addMonths(dateStr, months){
     if(!dateStr) return '';
     const d = new Date(dateStr + 'T00:00:00');
@@ -2058,11 +1985,12 @@ op.appendChild(calBtn);
     const b = new Date(toDateStr + 'T00:00:00').getTime();
     return Math.floor((b - a) / (24*60*60*1000));
   }
-  const CONTACTS_KEY = (window.CONTACTS_KEY || 'yl_clean_contacts_v1');
   const REMIND_SOON_DAYS = 30;
 
+  // ---- Contacts storage (不依賴全域 contacts 陣列，直接用 localStorage，避免衝突) ----
+  const CONTACTS_KEY = (window.CONTACTS_KEY || 'yl_clean_contacts_v1');
   function loadContacts(){ try{ return JSON.parse(localStorage.getItem(CONTACTS_KEY)||'[]'); }catch(_){ return []; } }
-  function saveContacts(v){ localStorage.setItem(CONTACTS_KEY, JSON.stringify(v)); }
+  function saveContacts(list){ localStorage.setItem(CONTACTS_KEY, JSON.stringify(list)); }
   function normalizePhone(p){ return (p||'').replace(/\D+/g,''); }
 
   function upsertContactExtra(name, phone, address, lineId, extra){
@@ -2072,13 +2000,22 @@ op.appendChild(calBtn);
     let idx = -1;
     if(np) idx = list.findIndex(c=> normalizePhone(c.phone)===np);
     if(idx>=0){
-      list[idx] = Object.assign({}, base, list[idx], { name: list[idx].name||name, phone: list[idx].phone||phone, address: list[idx].address||address, lineId: list[idx].lineId||lineId }, extra||{});
+      list[idx] = Object.assign({}, base, list[idx], {
+        name: list[idx].name || name,
+        phone: list[idx].phone || phone,
+        address: list[idx].address || address,
+        lineId: list[idx].lineId || lineId
+      }, extra||{});
     }else{
-      list.push(Object.assign({ id:(crypto&&crypto.randomUUID)?crypto.randomUUID():String(Date.now())+Math.random(), name:name||'', phone:phone||'', address:address||'', lineId:lineId||'' }, base, extra||{}));
+      list.push(Object.assign({
+        id: (crypto&&crypto.randomUUID)? crypto.randomUUID(): String(Date.now())+Math.random(),
+        name: name||'', phone: phone||'', address: address||'', lineId: lineId||''
+      }, base, extra||{}));
     }
     saveContacts(list);
   }
 
+  // ---- Compute & render reminder cards ----
   function isSnoozed(c){
     if(!c || !c.snoozeUntil) return false;
     const today = new Date().toISOString().slice(0,10);
@@ -2087,16 +2024,17 @@ op.appendChild(calBtn);
   function computeBuckets(){
     const list = loadContacts();
     const todayStr = new Date().toISOString().slice(0,10);
-    const due=[], soon=[];
+    const due = [], soon = [];
     list.forEach(c=>{
-      if(c.mute===true) return;
-      if(isSnoozed(c)) return;
+      if(c.mute===true) return;           // 不再提醒 → 排除
+      if(isSnoozed(c)) return;            // 暫停期間 → 排除
       if(!c || !c.nextDueDate) return;
       const d = daysDiff(todayStr, c.nextDueDate);
       if(isNaN(d)) return;
       if(d<=0) due.push(Object.assign({days:d}, c));
       else if(d<=REMIND_SOON_DAYS) soon.push(Object.assign({days:d}, c));
     });
+    // sort by nextDueDate
     due.sort((a,b)=> (a.nextDueDate||'').localeCompare(b.nextDueDate||''));
     soon.sort((a,b)=> (a.nextDueDate||'').localeCompare(b.nextDueDate||''));
     return { due, soon };
@@ -2104,25 +2042,37 @@ op.appendChild(calBtn);
 
   function renderReminderSection(){
     const sec = $('reminderSection'); if(!sec) return;
+    const sum = $('reminderSummary');
+    const list = $('reminderList');
     let { due, soon } = computeBuckets();
-    const filterSel = $('reminderFilter');
+    const filterSel = document.getElementById('reminderFilter');
     const mode = filterSel ? filterSel.value : 'active';
-    const allList = loadContacts();
+    // Re-load full list for filtered views that include muted/snoozed
+    const allList = (function(){ try{return JSON.parse(localStorage.getItem(CONTACTS_KEY)||'[]');}catch(_){return [];} })();
     if(mode==='muted'){
-      due = allList.filter(c=>c.mute===true).map(c=>Object.assign({labelOverride:'不再提醒'}, c));
+      due = allList.filter(c=>c.mute===true);
       soon = [];
     } else if(mode==='snoozed'){
       const today = new Date().toISOString().slice(0,10);
-      due = allList.filter(c=>c.snoozeUntil && c.snoozeUntil>=today).map(c=>Object.assign({labelOverride:'暫停中'}, c));
+      due = allList.filter(c=>c.snoozeUntil && c.snoozeUntil>=today);
       soon = [];
     } else if(mode==='all'){
+      // Show active due/soon plus muted/snoozed appended
       const today = new Date().toISOString().slice(0,10);
       const muted = allList.filter(c=>c.mute===true).map(c=>Object.assign({labelOverride:'不再提醒'}, c));
       const snoozed = allList.filter(c=>c.snoozeUntil && c.snoozeUntil>=today).map(c=>Object.assign({labelOverride:'暫停中'}, c));
+      // Keep active buckets, append others to 'soon' bucket for display
       soon = soon.concat(snoozed, muted);
     }
 
-    const list = $('reminderList');
+    if(sum){
+      sum.innerHTML = '';
+      const mk = (t,v,h='')=>{ const box=document.createElement('div'); box.className='box'; box.innerHTML = `<div class="small muted">${t}</div><div class="number">${v}</div>${h?`<div class="small muted">${h}</div>`:''}`; return box; };
+      sum.appendChild(mk('到期', due.length));
+      sum.appendChild(mk('30天內', soon.length));
+      sum.appendChild(mk('提醒總數', due.length + soon.length));
+    }
+
     if(list){
       const row = (c,label,idx)=> `<tr data-phone="${c.phone||''}">
   <td>${label}</td>
@@ -2140,42 +2090,19 @@ op.appendChild(calBtn);
     <button class="remAction" data-act="unmute" data-phone="${c.phone||''}">恢復</button>
   </td>
 </tr>`;
-
       list.innerHTML = `
-  <details class="accordion" id="duePanel" open>
-    <summary class="accordion-summary">到期（${due.length}）</summary>
-    <div class="content">
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr><th>狀態</th><th>客戶</th><th>電話</th><th>地址</th><th>上次清洗</th><th>週期(月)</th><th>下次到期</th><th>操作</th></tr></thead>
-        <tbody>
-          ${due.map((c,i)=>row(c, c.labelOverride||'到期', i)).join('')}
-        </tbody>
-      </table>
-    </div>
-  </details>
-  <div class="hr" style="margin:8px 0"></div>
-  <details class="accordion" id="soonPanel" open>
-    <summary class="accordion-summary">30 天內（${soon.length}）</summary>
-    <div class="content">
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr><th>狀態</th><th>客戶</th><th>電話</th><th>地址</th><th>上次清洗</th><th>週期(月)</th><th>下次到期</th><th>操作</th></tr></thead>
-        <tbody>
-          ${soon.map((c,i)=>row(c, c.labelOverride||'即將到期', i)).join('')}
-        </tbody>
-      </table>
-    </div>
-  </details>`;
-
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr><th>狀態</th><th>客戶</th><th>電話</th><th>地址</th><th>上次清洗</th><th>週期(月)</th><th>下次到期</th><th>操作</th></tr></thead>
+          <tbody>
+            ${due.map((c,i)=>row(c, c.labelOverride||'到期', i)).join('')}
+            ${soon.map((c,i)=>row(c, c.labelOverride||'即將到期', i)).join('')}
+          </tbody>
+        </table>`;
       bindReminderActions();
-
-      // auto-collapse if empty
-      const duePanel = $('duePanel');
-      const soonPanel = $('soonPanel');
-      if(duePanel && due.length===0) duePanel.removeAttribute('open');
-      if(soonPanel && soon.length===0) soonPanel.removeAttribute('open');
     }
   }
 
+  // --- Actions / utilities ---
   function updateContactByPhone(phone, updater){
     const list = loadContacts();
     const idx = list.findIndex(c => (c.phone||'') === phone);
@@ -2187,8 +2114,9 @@ op.appendChild(calBtn);
   function todayStr(){ return new Date().toISOString().slice(0,10); }
 
   function bindReminderActions(){
-    const container = $('reminderList');
+    const container = document.getElementById('reminderList');
     if(!container) return;
+    // Row action buttons
     container.querySelectorAll('.remAction').forEach(btn=>{
       btn.addEventListener('click', function(){
         const act = this.getAttribute('data-act');
@@ -2197,9 +2125,9 @@ op.appendChild(calBtn);
         if(act==='notified'){
           updateContactByPhone(phone, c => { c.lastNotified = todayStr(); });
         }else if(act==='snooze7'){
-          updateContactByPhone(phone, c => { c.snoozeUntil = todayStr(); c.snoozeUntil = addDays(todayStr(), 7); });
+          updateContactByPhone(phone, c => { c.snoozeUntil = addMonths(todayStr(), 0); c.snoozeUntil = new Date(Date.now()+7*86400000).toISOString().slice(0,10); });
         }else if(act==='snooze30'){
-          updateContactByPhone(phone, c => { c.snoozeUntil = addDays(todayStr(), 30); });
+          updateContactByPhone(phone, c => { c.snoozeUntil = new Date(Date.now()+30*86400000).toISOString().slice(0,10); });
         }else if(act==='mute'){
           updateContactByPhone(phone, c => { c.mute = true; });
         }else if(act==='unmute'){
@@ -2208,13 +2136,14 @@ op.appendChild(calBtn);
         renderReminderSection();
       });
     });
+    // Bulk controls
     const bulkSnooze = document.getElementById('bulkSnooze');
     if(bulkSnooze){
       bulkSnooze.onchange = function(){
         const days = parseInt(this.value||'0',10);
         if(!days) return;
         const sel = [...container.querySelectorAll('.remSel:checked')].map(cb=>cb.getAttribute('data-phone'));
-        sel.forEach(phone=> updateContactByPhone(phone, c=>{ c.snoozeUntil = addDays(todayStr(), days);}));
+        sel.forEach(phone=> updateContactByPhone(phone, c=>{ c.snoozeUntil = new Date(Date.now()+days*86400000).toISOString().slice(0,10);}));
         this.value = '';
         renderReminderSection();
       };
@@ -2228,41 +2157,63 @@ op.appendChild(calBtn);
       };
     }
     const filterSel = document.getElementById('reminderFilter');
-    if(filterSel){ filterSel.onchange = renderReminderSection; }
+    if(filterSel){
+      filterSel.onchange = renderReminderSection;
+    }
+  }
+  // ---- Inject a small "保養週期(月)" input into the order form toolbar (右側) ----
+  function ensureCycleInput(){
+    if(document.getElementById('cycleMonths')) return; // already exists
+    const right = document.querySelector('#orderForm .toolbar .right');
+    if(!right) return;
+    const wrap = document.createElement('div');
+    wrap.style.display='inline-block';
+    wrap.style.marginRight='8px';
+    wrap.innerHTML = '<label style="margin-right:4px;">保養週期(月)</label><input id="cycleMonths" type="number" min="1" step="1" value="24" style="width:80px">';
+    right.prepend(wrap);
   }
 
-  // Hook saveOrder (不改你原本的 Google 等其他功能）
+  // ---- Non-invasive saveOrder hook：先擷取表單資料，再呼叫原本的 saveOrder，最後刷新提醒 ----
   const originalSaveOrder = window.saveOrder;
   window.saveOrder = function(e){
-    // 儲存前先抓表單資料（原 saveOrder 會清除表單）
+    // 預先擷取表單資料（原本 saveOrder 儲存後會清表單）
     let data = {};
     try{ if(typeof window.gatherForm==='function') data = window.gatherForm() || {}; }catch(_){ data = {}; }
     const cm = +(document.getElementById('cycleMonths')?.value || 24);
 
-    // 呼叫原本 saveOrder
+    // 呼叫原本邏輯
     let ret;
-    if(typeof originalSaveOrder === 'function'){ ret = originalSaveOrder.apply(this, arguments); }
+    if(typeof originalSaveOrder === 'function'){
+      ret = originalSaveOrder.apply(this, arguments);
+    }
 
-    // 依完成狀態更新該客戶的保養資訊
+    // 若本次為「完成」且有日期，更新該客戶的到期欄位
     try{
       if(data && data.status==='完成' && data.date){
         const nextDue = addMonths(data.date, cm);
-        upsertContactExtra(data.customer, data.phone, data.address, data.lineId, { lastCleanDate:data.date, cycleMonths:cm, nextDueDate:nextDue });
+        upsertContactExtra(data.customer, data.phone, data.address, data.lineId, {
+          lastCleanDate: data.date,
+          cycleMonths: cm,
+          nextDueDate: nextDue
+        });
       }else if(data){
-        upsertContactExtra(data.customer, data.phone, data.address, data.lineId, { cycleMonths:cm });
+        // 至少記住週期設定
+        upsertContactExtra(data.customer, data.phone, data.address, data.lineId, { cycleMonths: cm });
       }
-    }catch(_){}
+    }catch(_){ /* ignore */ }
 
+    // 重新渲染提醒卡片
     renderReminderSection();
     return ret;
   };
 
   document.addEventListener('DOMContentLoaded', function(){
+    ensureCycleInput();
     renderReminderSection();
   });
 })();
 </script>
-<!-- END: Reminder Engine (accordion + controls; 不動 Google) -->
+<!-- END: Reminder Engine (外置區塊 + 自訂週期；不動 Google 相關程式) -->
 
 </body>
 </html>
