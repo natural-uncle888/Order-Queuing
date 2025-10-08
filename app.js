@@ -5,7 +5,7 @@
     const pad2 = n => n.toString().padStart(2,'0');
     const SLOT_OPTS = ['平日','假日','上午','下午','皆可','日期指定'];
     const CONTACT_TIME_OPTS = ['平日','假日','上午','下午','晚上','皆可','時間指定'];
-    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','有電梯'];
+    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','有電梯'];
     const STATUS_FLOW = ['排定','完成','未完成'];
 
     function renderChecks(containerId, options, name){
@@ -102,7 +102,7 @@ function findContactByPhone(phone){
     }
     function initStaffSelects(){ $('staff').innerHTML = staffList.map(s=>`<option value="${s}">${s}</option>`).join(''); initFilters(); }
     function initContactSelect(){ $('contactMethod').innerHTML = contactList.map(c=>`<option value="${c}">${c}</option>`).join(''); }
-    function initCheckboxes(){ renderChecks('slotGroup', SLOT_OPTS, 'slot'); renderChecks('contactTimesGroup', CONTACT_TIME_OPTS, 'contactTime'); renderChecks('acFloors', FLOOR_OPTS, 'acFloor'); renderChecks('washerFloors', FLOOR_OPTS, 'washerFloor'); }
+    function initCheckboxes(){ renderChecks('slotGroup', SLOT_OPTS, 'slot'); renderChecks('contactTimesGroup', CONTACT_TIME_OPTS, 'contactTime'); renderChecks('acFloors', FLOOR_OPTS, 'acFloor'); renderChecks('washerFloors', FLOOR_OPTS, 'washerFloor'); updateAbove5Visibility(); }
     function initExpenseCats(){ $('expCategory').innerHTML = expCats.map(c=>`<option value="${c}">${c}</option>`).join(''); }
 
     
@@ -155,7 +155,10 @@ function calcTotal(f){
 
 function gatherForm(){
       return {
-    durationMinutes: +$('durationMinutes').value || 120,
+    
+    acFloorAbove: (document.querySelector('input[type="checkbox"][data-name="acFloor"][value="5F以上"]:checked') ? ($('acFloorAbove')?.value||'').trim() : ''),
+    washerFloorAbove: (document.querySelector('input[type="checkbox"][data-name="washerFloor"][value="5F以上"]:checked') ? ($('washerFloorAbove')?.value||'').trim() : ''),
+durationMinutes: +$('durationMinutes').value || 120,
         id: $('id').value || crypto.randomUUID(),
         staff:$('staff').value, date:$('date').value, time:$('time').value,
         confirmed:$('confirmed')?.checked||false, quotationOk:$('quotationOk')?.checked||false,
@@ -182,7 +185,9 @@ function gatherForm(){
       $('residenceType').value=o.residenceType||''; $('residenceOther').value=o.residenceOther||''; $('residenceOther').classList.toggle('hidden', (o.residenceType||'')!=='其他');
       setChecked('contactTime', o.contactTimes||[]); $('contactTimeNote').value=o.contactTimeNote||''; $('contactTimeNote').classList.toggle('hidden', !(o.contactTimes||[]).includes('時間指定'));
       setChecked('acFloor', o.acFloors||[]); setChecked('washerFloor', o.washerFloors||[]);
+      updateAbove5Visibility();
       $('contactMethod').value=o.contactMethod||contactList[0]; $('status').value=o.status||'排定';
+      $('acFloorAbove').value=o.acFloorAbove||''; $('washerFloorAbove').value=o.washerFloorAbove||'';
       $('acSplit').value=o.acSplit||0; $('acDuct').value=o.acDuct||0; $('washerTop').value=o.washerTop||0; $('waterTank').value=o.waterTank||0;
       $('pipesAmount').value=o.pipesAmount||0; $('antiMold').value=o.antiMold||0; $('ozone').value=o.ozone||0;
       $('transformerCount').value=o.transformerCount||0; $('longSplitCount').value=o.longSplitCount||0; $('onePieceTray').value=o.onePieceTray||0;
@@ -304,6 +309,20 @@ function gatherForm(){
           tr.children[11]?.classList.add('col-total');    // 總金額
         } catch(err) { /* noop */ }
 
+
+        // Append floor info to 地址 cell
+        try {
+          const addrTd = tr.children[7];
+          const acList = Array.isArray(o.acFloors) ? o.acFloors.slice() : [];
+          const wList  = Array.isArray(o.washerFloors) ? o.washerFloors.slice() : [];
+          const acExtra = (acList.includes('5F以上') && (o.acFloorAbove||'').trim()) ? `（實際：${(o.acFloorAbove||'').trim()}）` : '';
+          const wExtra  = (wList.includes('5F以上') && (o.washerFloorAbove||'').trim()) ? `（實際：${(o.washerFloorAbove||'').trim()}）` : '';
+          const parts = [];
+          if (acList.length) parts.push(`冷氣：${acList.join('、')}${acExtra}`);
+          if (wList.length)  parts.push(`洗衣：${wList.join('、')}${wExtra}`);
+          const note = parts.length ? `<div class="floor-note">${parts.join('｜')}</div>` : '';
+          addrTd.innerHTML = `${escapeHtml(o.address||'')}${note}`;
+        } catch(err) { /* noop */ }
         tbody.appendChild(tr);
       });
 // Summary
@@ -706,7 +725,23 @@ recalcTotals();
     });
     function addExpCat(){ const name=prompt('輸入新花費類別：')?.trim(); if(!name) return; if(!expCats.includes(name)){ expCats.push(name); save(EXP_CAT_KEY, expCats); initExpenseCats(); } $('expCategory').value=name; }
 
-    // ---------- Events ----------
+    
+// --- Above-5F toggles ---
+function updateAbove5Visibility(){
+  const acChecked = !!document.querySelector('input[type="checkbox"][data-name="acFloor"][value="5F以上"]:checked');
+  const wChecked  = !!document.querySelector('input[type="checkbox"][data-name="washerFloor"][value="5F以上"]:checked');
+  const acWrap = document.getElementById('acFloorAboveWrap');
+  const wWrap  = document.getElementById('washerFloorAboveWrap');
+  if(acWrap) acWrap.classList.toggle('hidden', !acChecked);
+  if(wWrap)  wWrap.classList.toggle('hidden', !wChecked);
+}
+document.addEventListener('change', (e)=>{
+  if(e.target && e.target.matches('input[type="checkbox"][data-name="acFloor"], input[type="checkbox"][data-name="washerFloor"]')){
+    updateAbove5Visibility();
+  }
+});
+
+// ---------- Events ----------
     function attachEvents(){
       // order form
       $('orderForm').addEventListener('submit', saveOrder);
@@ -1302,8 +1337,8 @@ async function uploadEventToCalendar(o) {
     description: [
       `姓名：${o.customer || ''}`,
       `電話：${o.phone || ''}`,
-      (o.acFloors && o.acFloors.length > 0) ? `冷氣位於樓層：${o.acFloors.join('、')}` : '',
-      (o.washerFloors && o.washerFloors.length > 0) ? `洗衣機位於樓層：${o.washerFloors.join('、')}` : ''
+      (o.acFloors && o.acFloors.length > 0) ? `冷氣位於樓層：${o.acFloors.join('、')}${ (o.acFloors.includes('5F以上') && (o.acFloorAbove||'').trim() ? `（實際：${(o.acFloorAbove||'').trim()}）` : '') }` : '',
+      (o.washerFloors && o.washerFloors.length > 0) ? `洗衣機位於樓層：${o.washerFloors.join('、')}${ (o.washerFloors.includes('5F以上') && (o.washerFloorAbove||'').trim() ? `（實際：${(o.washerFloorAbove||'').trim()}）` : '') }` : ''
     ].filter(Boolean).join('\n'),
     start: { dateTime: start.toISOString() },
     end: { dateTime: end.toISOString() }

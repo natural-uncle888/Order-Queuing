@@ -305,3 +305,21 @@ th.col-total, td.col-total {
     line-height: 1.1;
   }
 }
+
+
+/* === Above-5F manual input === */
+#acFloorAboveWrap, #washerFloorAboveWrap {
+  margin-top: 6px;
+}
+#acFloorAbove, #washerFloorAbove {
+  width: 180px;
+  max-width: 100%;
+}
+
+/* === Floor info note appended to 地址 cell === */
+.floor-note {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 2px;
+  white-space: normal;
+}
