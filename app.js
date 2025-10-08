@@ -106,6 +106,57 @@ function findContactByPhone(phone){
     function initExpenseCats(){ $('expCategory').innerHTML = expCats.map(c=>`<option value="${c}">${c}</option>`).join(''); }
 
     
+
+// ---------- Reminder Utilities ----------
+function addMonths(dateStr, months){
+  if(!dateStr) return null;
+  const d = new Date(dateStr);
+  if(isNaN(d)) return null;
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  if(d.getDate() < day) d.setDate(0);
+  return d;
+}
+
+function fmtDate(d){
+  if(!d) return '';
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+
+function lastCompletedDateForCustomer(name){
+  const n = (name||'').trim();
+  if(!n) return null;
+  // find latest order with status 完成 for this customer
+  const done = orders
+    .filter(o => (o.customer||'').trim()===n && (o.status||'')==='完成' && (o.date || o.completedAt))
+    .sort((a,b)=> new Date(b.date||b.completedAt) - new Date(a.date||a.completedAt));
+  if(done.length===0) return null;
+  return done[0].date || done[0].completedAt;
+}
+
+function reminderMonthsForCustomer(name){
+  const n = (name||'').trim();
+  if(!n) return 0;
+  // prefer the last completed order's reminderMonths if set; else the latest order's setting
+  const related = orders
+    .filter(o => (o.customer||'').trim()===n)
+    .sort((a,b)=> new Date(b.createdAt||b.date||b.completedAt||0) - new Date(a.createdAt||a.date||a.completedAt||0));
+  if(related.length===0) return 0;
+  const lastDone = related.find(o => (o.status||'')==='完成' && +o.reminderMonths>0);
+  if(lastDone) return +lastDone.reminderMonths;
+  const any = related.find(o => +o.reminderMonths>0);
+  return any ? +any.reminderMonths : 0;
+}
+
+function nextDueDateForCustomer(name){
+  const months = reminderMonthsForCustomer(name);
+  if(!months) return null;
+  const last = lastCompletedDateForCustomer(name);
+  if(!last) return null;
+  return addMonths(last, months);
+}
+
 // ---------- Pricing (extracted constants) ----------
 const PRICING = {
   acSplit: { unit: 1800, bulk3plus: 1500 },
@@ -156,7 +207,10 @@ function calcTotal(f){
 function gatherForm(){
       return {
     
-    acFloorAbove: (document.querySelector('input[type="checkbox"][data-name="acFloor"][value="5F以上"]:checked') ? ($('acFloorAbove')?.value||'').trim() : ''),
+    
+        reminderEnabled: !!($('reminderEnabled')?.checked),
+        reminderMonths: +$('reminderMonths')?.value || 0,
+acFloorAbove: (document.querySelector('input[type="checkbox"][data-name="acFloor"][value="5F以上"]:checked') ? ($('acFloorAbove')?.value||'').trim() : ''),
     washerFloorAbove: (document.querySelector('input[type="checkbox"][data-name="washerFloor"][value="5F以上"]:checked') ? ($('washerFloorAbove')?.value||'').trim() : ''),
 durationMinutes: +$('durationMinutes').value || 120,
         id: $('id').value || crypto.randomUUID(),
@@ -186,7 +240,9 @@ durationMinutes: +$('durationMinutes').value || 120,
       setChecked('contactTime', o.contactTimes||[]); $('contactTimeNote').value=o.contactTimeNote||''; $('contactTimeNote').classList.toggle('hidden', !(o.contactTimes||[]).includes('時間指定'));
       setChecked('acFloor', o.acFloors||[]); setChecked('washerFloor', o.washerFloors||[]);
       updateAbove5Visibility();
+      (function(){ const nd = nextDueDateForCustomer($('customer').value); $('nextReminder').value = nd ? fmtDate(nd) : ''; })();
       $('contactMethod').value=o.contactMethod||contactList[0]; $('status').value=o.status||'排定';
+      $('reminderEnabled').checked=!!o.reminderEnabled; $('reminderMonths').value=+o.reminderMonths||'';
       $('acFloorAbove').value=o.acFloorAbove||''; $('washerFloorAbove').value=o.washerFloorAbove||'';
       $('acSplit').value=o.acSplit||0; $('acDuct').value=o.acDuct||0; $('washerTop').value=o.washerTop||0; $('waterTank').value=o.waterTank||0;
       $('pipesAmount').value=o.pipesAmount||0; $('antiMold').value=o.antiMold||0; $('ozone').value=o.ozone||0;
@@ -326,6 +382,7 @@ durationMinutes: +$('durationMinutes').value || 120,
         tbody.appendChild(tr);
       });
 // Summary
+      refreshDueSoonPanel();
       const sumEl=$('summary'); sumEl.innerHTML='';
       // Only include dated orders of the selected month for sums
       const monthly = orders.filter(o=> o.date && (new Date(o.date).getFullYear()===y) && (new Date(o.date).getMonth()+1===m));
@@ -741,6 +798,84 @@ document.addEventListener('change', (e)=>{
   }
 });
 
+
+// ---------- Due Soon Panel ----------
+function findLatestOrderByCustomer(name){
+  const n=(name||'').trim();
+  if(!n) return null;
+  const related = orders
+    .filter(o => (o.customer||'').trim()===n)
+    .sort((a,b)=> new Date(b.createdAt||b.date||b.completedAt||0) - new Date(a.createdAt||a.date||a.completedAt||0));
+  return related[0] || null;
+}
+
+function refreshDueSoonPanel(){
+  const panel = document.getElementById('dueSoonPanel');
+  const listEl = document.getElementById('dueSoonList');
+  if(!panel || !listEl) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const seen = new Set();
+  const items = [];
+  orders.forEach(o => {
+    if(!o.reminderEnabled) return;
+    const name = (o.customer||'').trim();
+    if(!name || seen.has(name)) return;
+    seen.add(name);
+    const nd = nextDueDateForCustomer(name);
+    if(!nd) return;
+    const days = Math.floor((nd - today)/(24*60*60*1000));
+    if(days <= 30){
+      const latest = findLatestOrderByCustomer(name) || {};
+      items.push({
+        name,
+        due: nd,
+        days,
+        phone: latest.phone||'',
+        address: latest.address||'',
+        last: lastCompletedDateForCustomer(name) || '',
+        obj: latest
+      });
+    }
+  });
+  items.sort((a,b)=> a.days - b.days);
+  const top = items.slice(0, 20);
+  if(top.length === 0){
+    listEl.classList.add('empty');
+    listEl.innerHTML = '目前沒有 30 天內將到期的客戶';
+    return;
+  }
+  listEl.classList.remove('empty');
+  listEl.innerHTML = top.map(it => {
+    const dueStr = fmtDate(it.due);
+    const badge = it.days <= 0 ? `<span class="badge due">⚠️ 到期 ${dueStr}</span>` : `<span class="badge soon">⏰ ${it.days} 天後到期</span>`;
+    const lastStr = it.last ? `最近完成：${(it.last||'').slice(0,10)}` : '';
+    const phoneStr = it.phone ? it.phone : '';
+    const addrStr = it.address ? it.address : '';
+    return `<div class="row">
+      <div class="name">${it.name} ${badge}</div>
+      <div class="muted">${lastStr}</div>
+      <div class="muted">${phoneStr}</div>
+      <div class="muted">${addrStr}</div>
+      <div><button class="inline-btn" data-open="${it.obj?.id||''}">開啟</button></div>
+    </div>`;
+  }).join('');
+  // Attach open handlers
+  listEl.querySelectorAll('button[data-open]').forEach(btn => {
+    btn.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      const id = btn.getAttribute('data-open');
+      const target = orders.find(x=> x.id===id) || null;
+      if(target){ fillForm(target); }
+      else {
+        // 若找不到特定訂單，就新建一筆以該客戶為基底
+        fillForm({ customer: btn.closest('.row').querySelector('.name')?.textContent.trim().split(' ')[0] || '' });
+      }
+      document.getElementById('orderAccordion').open = true;
+      document.getElementById('orderAccordion').scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  });
+}
+
 // ---------- Events ----------
     function attachEvents(){
       // order form
@@ -775,6 +910,11 @@ $('importJson').addEventListener('click', importJSON);
         if(c){ if(!$('customer').value) $('customer').value = c.name||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
       });
 
+
+
+      // Recompute nextReminder when customer/reminderMonths change
+      $('customer').addEventListener('blur', ()=>{ const nd = nextDueDateForCustomer($('customer').value); $('nextReminder').value = nd ? fmtDate(nd) : ''; });
+      $('reminderMonths').addEventListener('input', ()=>{ const nd = nextDueDateForCustomer($('customer').value); $('nextReminder').value = nd ? fmtDate(nd) : ''; });
 
       // expenses
       $('expenseForm').addEventListener('submit', saveExpense);
@@ -881,6 +1021,29 @@ $('importJson').addEventListener('click', importJSON);
 
     // ---------- Boot ----------
     (function boot(){
+      setTimeout(refreshDueSoonPanel, 0);
+
+      // Reminder summary (non-intrusive console + optional alert)
+      try{
+        const today = new Date(); today.setHours(0,0,0,0);
+        let due=0, soon=0;
+        const seen = new Set();
+        orders.forEach(o=>{
+          if(!o.reminderEnabled) return;
+          const name = (o.customer||'').trim();
+          if(!name || seen.has(name)) return;
+          seen.add(name);
+          const nd = nextDueDateForCustomer(name);
+          if(!nd) return;
+          const days = Math.floor((nd - today)/(24*60*60*1000));
+          if(days <= 0) due++;
+          else if(days <= 30) soon++;
+        });
+        if(due>0 || soon>0){
+          console.log(`[提醒] 到期:${due}，將到期(30天內):${soon}`);
+        }
+      }catch(e){}
+
       initYearMonth(); initStaffSelects(); initContactSelect(); initCheckboxes(); initExpenseCats();
       attachEvents(); refreshContactsDatalist(); fillForm({}); fillExpForm({}); refreshTable(); refreshExpense();
     })();

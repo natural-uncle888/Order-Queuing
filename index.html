@@ -69,6 +69,13 @@
         2) 直接點「日期」或「時間」欄可快速編輯；Enter/失焦儲存，Esc 取消。 3) 右上可用關鍵字搜尋（姓名/電話/地址），結果會自動高亮。
         未填日期會標記 <span class="badge-soft">未排期</span>、未填時間會標記 <span class="badge-soft">未排定</span>。</div>
 <div style="overflow:auto;margin-top:8px">
+
+<!-- 快到期提醒區塊 -->
+<div id="dueSoonPanel" class="card due-panel">
+  <div class="card-title">快到期提醒（30 天內）</div>
+  <div id="dueSoonList" class="due-list empty">目前沒有 30 天內將到期的客戶</div>
+</div>
+
 <table id="ordersTable">
 <thead>
 <tr>
@@ -264,6 +271,22 @@
 <div class="row">
 <div class="col" style="grid-column:span 3">
 <label>總金額（自動）</label>
+
+<div class="row">
+  <div class="col" style="grid-column:span 3">
+    <label>啟用提醒</label>
+    <label class="pill"><input id="reminderEnabled" type="checkbox"> <span>啟用</span></label>
+  </div>
+  <div class="col" style="grid-column:span 3">
+    <label>提醒週期（月）</label>
+    <input id="reminderMonths" type="number" min="0" step="1" placeholder="例如 12">
+  </div>
+  <div class="col" style="grid-column:span 3">
+    <label>下次提醒（自動計算）</label>
+    <input id="nextReminder" type="text" disabled>
+  </div>
+</div>
+
 <input id="total" readonly="" type="number"/>
 </div>
 <div class="col" style="grid-column:span 3">
