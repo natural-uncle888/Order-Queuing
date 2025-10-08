@@ -323,6 +323,107 @@ tr.overdue td{background:#fef2f2}
 
 </style>
 <script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11">
+
+function renderContactsTable() {
+  const tbody = $('contactsTable').querySelector('tbody');
+  tbody.innerHTML = contacts.map((c, idx) => {
+    const cy = c.periodYears ?? '';
+    return `
+      <tr>
+        <td>${escapeHtml(c.name || '')}</td>
+        <td>${escapeHtml(c.phone || '')}</td>
+        <td>${escapeHtml(c.address || '')}</td>
+        <td>${escapeHtml(c.lineId || '')}</td>
+        <td><input type="number" min="1" step="1" data-idx="${idx}" value="${cy}" style="width:80px"/></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function saveContactPeriods() {
+  const inputs = $('contactsTable').querySelectorAll('input[type="number"]');
+  let changed = 0;
+  inputs.forEach(input => {
+    const idx = +input.dataset.idx;
+    const val = input.value.trim();
+    if (val === '') {
+      delete contacts[idx].periodYears;
+      changed++;
+    } else {
+      const n = +val;
+      if (!isNaN(n) && n > 0) {
+        contacts[idx].periodYears = n;
+        changed++;
+      }
+    }
+  });
+  save(CONTACTS_KEY, contacts);
+  alert(`已儲存 ${changed} 筆通訊錄變更`);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (typeof renderContactsTable === 'function') renderContactsTable();
+});
+
+function renderMutedList() {
+  const container = $('mutedListContainer');
+  if (!container || !Array.isArray(orders)) return;
+
+  const cooldownDays = +($('cooldownDays')?.value || 7);
+  const now = Date.now();
+
+  // 篩選在冷卻期內的訂單（根據 completedAt）
+  const mutedMap = new Map();
+  orders.forEach(o => {
+    if (!o.completedAt || !o.customer) return;
+    const completedTime = new Date(o.completedAt).getTime();
+    if ((now - completedTime) < cooldownDays * 86400 * 1000) {
+      mutedMap.set(o.customer, completedTime);
+    }
+  });
+
+  if (mutedMap.size === 0) {
+    container.innerHTML = '<div class="tiny muted">目前沒有處於冷卻期的客戶。</div>';
+    return;
+  }
+
+  const listHtml = Array.from(mutedMap.entries()).map(([name, time]) => {
+    const dateStr = new Date(time).toLocaleDateString();
+    return `<div class="reminder-item">
+      <div><strong>${escapeHtml(name)}</strong> <span class="tiny muted">完成於 ${dateStr}</span></div>
+      <button class="inline-btn" onclick="unmuteCustomer('${escapeHtml(name)}')">恢復提醒</button>
+    </div>`;
+  }).join('');
+  container.innerHTML = '<div class="reminder-panel">' + listHtml + '</div>';
+}
+
+function unmuteCustomer(name) {
+  if (!name || !confirm(`確定要讓「${name}」恢復提醒嗎？`)) return;
+  let updated = 0;
+  const cooldownDays = +($('cooldownDays')?.value || 7);
+  const now = Date.now();
+
+  orders.forEach(o => {
+    if (o.customer === name && o.completedAt) {
+      const time = new Date(o.completedAt).getTime();
+      if ((now - time) < cooldownDays * 86400 * 1000) {
+        o.completedAt = new Date(now - cooldownDays * 86400 * 1000 - 1).toISOString();
+        updated++;
+      }
+    }
+  });
+
+  if (updated > 0) {
+    save(KEY, orders);
+    alert(`已讓「${name}」恢復提醒 (${updated} 筆訂單更新)`);
+    refreshReminders?.();
+    renderMutedList?.();
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (typeof renderMutedList === 'function') renderMutedList();
+});
 </script></head>
 <body>
 <header>
@@ -381,23 +482,44 @@ tr.overdue td{background:#fef2f2}
         1) 點「狀況」籤可快速切換（排定 → 完成 → 未完成）。
         2) 直接點「日期」或「時間」欄可快速編輯；Enter/失焦儲存，Esc 取消。 3) 右上可用關鍵字搜尋（姓名/電話/地址），結果會自動高亮。
         未填日期會標記 <span class="badge-soft">未排期</span>、未填時間會標記 <span class="badge-soft">未排定</span>。</div>
+<details class="accordion" id="contactsAcc">
+<summary>📇 通訊錄管理（週期批次調整）</summary>
+<div class="content">
+<div class="toolbar" style="margin-bottom:12px">
+<button class="primary" onclick="saveContactPeriods()">儲存變更</button>
+<span class="tiny muted">提示：欄位留空代表使用全域預設週期</span>
+</div>
+<div style="overflow:auto; max-height:400px">
+<table id="contactsTable">
+<thead>
+<tr>
+<th>姓名</th>
+<th>電話</th>
+<th>地址</th>
+<th>LINE ID</th>
+<th>週期(年)</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
+</details>
 <div style="overflow:auto;margin-top:8px">
-
 <!-- Reminder / Alerts -->
 <section class="reminder-panel" id="reminderPanel">
-  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
-    <div><span style="font-weight:700">到期提醒</span> <span id="reminderCount" class="badge muted">0</span></div>
-    <div class="settings-row">
-      <label>週期(年)：<input id="remYears" type="number" min="1" step="1" style="width:70px" value="2"></label>
-      <label>提前提醒(天)：<input id="leadDays" type="number" min="0" step="1" style="width:90px" value="30">
-      <label>通知冷卻(天)：<input id="cooldownDays" type="number" min="0" step="1" style="width:90px" value="7"></label></label>
-      <button id="saveRemPrefs" type="button" class="inline-btn">儲存</button>
-      <button id="pushNotify" type="button" class="inline-btn">桌面通知</button>
-    </div>
-  </div>
-  <div id="reminderList" class="tiny">目前沒有即將到期的客戶。</div>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+<div><span style="font-weight:700">到期提醒</span> <span class="badge muted" id="reminderCount">0</span></div>
+<div class="settings-row">
+<label>週期(年)：<input id="remYears" min="1" step="1" style="width:70px" type="number" value="2"/></label>
+<label>提前提醒(天)：<input id="leadDays" min="0" step="1" style="width:90px" type="number" value="30"/>
+<label>通知冷卻(天)：<input id="cooldownDays" min="0" step="1" style="width:90px" type="number" value="7"/></label></label>
+<button class="inline-btn" id="saveRemPrefs" type="button">儲存</button>
+<button class="inline-btn" id="pushNotify" type="button">桌面通知</button>
+</div>
+</div>
+<div class="tiny" id="reminderList">目前沒有即將到期的客戶。</div>
 </section>
-
 <table id="ordersTable">
 <thead>
 <tr>
@@ -447,10 +569,10 @@ tr.overdue td{background:#fef2f2}
 <div class="row">
 <div class="col" style="grid-column:span 6">
 <label>姓名（支援通訊錄）</label>
-<input id="customer" list="contactsDL" placeholder="客戶姓名" type="text"/>
+<input id="customer" list="contactsDL" placeholder="客戶姓名" type="text">
 <datalist id="contactsDL"></datalist>
 <div class="tiny">選既有客戶會自動帶出電話/地址</div>
-</div>
+</input></div>
 <div class="col" style="grid-column:span 3">
 <label>LINE or Fackbook ID</label>
 <input id="lineId" type="text"/>
@@ -460,13 +582,11 @@ tr.overdue td{background:#fef2f2}
 <input id="phone" placeholder="0912-345-678（可含 - ）" type="text"/>
 </div>
 </div>
-
 <div class="col" style="grid-column:span 3">
-  <label>客製週期(年)</label>
-  <input id="customerPeriodYears" type="number" min="1" step="1" placeholder="例如 2" />
-  <div class="tiny">留空則使用全域設定</div>
+<label>客製週期(年)</label>
+<input id="customerPeriodYears" min="1" placeholder="例如 2" step="1" type="number"/>
+<div class="tiny">留空則使用全域設定</div>
 </div>
-
 <div class="row">
 <div class="col" style="grid-column:span 5">
 <label>安排時段（可複選）</label>
@@ -694,6 +814,14 @@ tr.overdue td{background:#fef2f2}
 </div>
 </div>
 </details>
+<details class="accordion" id="mutedListAcc">
+<summary>🔕 靜音名單（可恢復提醒）</summary>
+<div class="content">
+<div class="tiny muted" style="margin-bottom:8px">以下為已進入通知冷卻期的客戶，可手動恢復提醒。</div>
+<div id="mutedListContainer">載入中...</div>
+</div>
+</details>
+
 </main>
 <input accept=".json" class="hidden" id="filePicker" type="file"/>
 <input accept=".json" class="hidden" id="filePickerExp" type="file"/>
