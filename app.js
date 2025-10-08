@@ -35,11 +35,26 @@
     function normalizePhone(p){ return (p||'').replace(/\D+/g,''); }
 
 // ---------- Validation ----------
-function isValidTwMobile(p){
+function isValidTwPhone(p){
   // Accept forms like 0912345678 or 0912-345-678
   const digits = (p||'').replace(/\D+/g, '');
   return /^09\d{8}$/.test(digits);
 }
+
+// --- Added: Taiwan landline + combined validator ---
+function isValidTwLandline(p){
+  const digits = (p||'').replace(/\D+/g, '');
+  if(!/^0\d+$/.test(digits)) return false;
+  if(digits.startsWith('09')) return false; // mobile handled elsewhere
+  // Taiwan landlines are typically 9~10 digits including area code (e.g., 02-xxxxxxxx, 03-xxxxxxx, 0836-xxxxxx)
+  return digits.length >= 9 && digits.length <= 10;
+}
+function isValidTwPhone(p){
+  return isValidTwPhone(p) || isValidTwLandline(p);
+}
+// ---------------------------------------------------
+
+
     function upsertContact(name, phone, address, lineId){
   const np = normalizePhone(phone);
   const lid = (lineId||'').trim();
@@ -681,7 +696,7 @@ durationMinutes: +$('durationMinutes').value || 120,
       // Contact validation: phone optional; LINE 可替代
       const phoneVal = $('phone')?.value?.trim() || '';
       const lineVal = $('lineId')?.value?.trim() || '';
-      if (phoneVal && !isValidTwMobile(phoneVal)){
+      if (phoneVal && !isValidTwPhone(phoneVal)){
         if (typeof Swal !== 'undefined' && Swal.fire){
           Swal.fire('電話格式不正確', '請輸入台灣手機（0912345678 或 0912-345-678），或改填 LINE 聯絡方式', 'warning');
         } else {
@@ -913,21 +928,15 @@ $('importJson').addEventListener('click', importJSON);
       // Autofill from contacts when name/phone entered
       $('customer').addEventListener('blur', ()=>{
         const c = findContactByName($('customer').value);
-        if(c){ if ($('phone').dataset.touched !== '1' && !$('phone').value) $('phone').value = c.phone || ''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
+        if(c){ $('phone').value = c.phone||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
       });
-      // ---- phone touched guard (so user can keep it empty) ----
-try {
-  $('phone').dataset.touched = $('phone').dataset.touched || '0';
-  $('phone').addEventListener('input', ()=>{ $('phone').dataset.touched = '1'; });
-} catch(e) { /* ignore if element missing */ }
-// ---------------------------------------------------------
-$('phone').addEventListener('blur', ()=>{
+      $('phone').addEventListener('blur', ()=>{
         const c2 = findContactByLineId($('lineId').value);
-        if(c2){ if(!$('customer').value) $('customer').value = c2.name||''; if(!$('address').value) $('address').value = c2.address||''; if ($('phone').dataset.touched !== '1' && !$('phone').value) $('phone').value = c2.phone || ''; }
+        if(c2){ if(!$('customer').value) $('customer').value = c2.name||''; if(!$('address').value) $('address').value = c2.address||''; if(!$('phone').value) $('phone').value = c2.phone||''; }
       });
       $('lineId').addEventListener('blur', ()=>{
         const c3 = findContactByLineId($('lineId').value);
-        if(c3){ if(!$('customer').value) $('customer').value = c3.name||''; if(!$('address').value) $('address').value = c3.address||''; if ($('phone').dataset.touched !== '1' && !$('phone').value) $('phone').value = c3.phone || ''; }
+        if(c3){ if(!$('customer').value) $('customer').value = c3.name||''; if(!$('address').value) $('address').value = c3.address||''; if(!$('phone').value) $('phone').value = c3.phone||''; }
       });
       $('phone').addEventListener('blur', ()=>{
         const c = findContactByPhone($('phone').value);
