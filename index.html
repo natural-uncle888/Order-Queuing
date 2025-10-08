@@ -364,66 +364,6 @@ function saveContactPeriods() {
 window.addEventListener('DOMContentLoaded', () => {
   if (typeof renderContactsTable === 'function') renderContactsTable();
 });
-
-function renderMutedList() {
-  const container = $('mutedListContainer');
-  if (!container || !Array.isArray(orders)) return;
-
-  const cooldownDays = +($('cooldownDays')?.value || 7);
-  const now = Date.now();
-
-  // 篩選在冷卻期內的訂單（根據 completedAt）
-  const mutedMap = new Map();
-  orders.forEach(o => {
-    if (!o.completedAt || !o.customer) return;
-    const completedTime = new Date(o.completedAt).getTime();
-    if ((now - completedTime) < cooldownDays * 86400 * 1000) {
-      mutedMap.set(o.customer, completedTime);
-    }
-  });
-
-  if (mutedMap.size === 0) {
-    container.innerHTML = '<div class="tiny muted">目前沒有處於冷卻期的客戶。</div>';
-    return;
-  }
-
-  const listHtml = Array.from(mutedMap.entries()).map(([name, time]) => {
-    const dateStr = new Date(time).toLocaleDateString();
-    return `<div class="reminder-item">
-      <div><strong>${escapeHtml(name)}</strong> <span class="tiny muted">完成於 ${dateStr}</span></div>
-      <button class="inline-btn" onclick="unmuteCustomer('${escapeHtml(name)}')">恢復提醒</button>
-    </div>`;
-  }).join('');
-  container.innerHTML = '<div class="reminder-panel">' + listHtml + '</div>';
-}
-
-function unmuteCustomer(name) {
-  if (!name || !confirm(`確定要讓「${name}」恢復提醒嗎？`)) return;
-  let updated = 0;
-  const cooldownDays = +($('cooldownDays')?.value || 7);
-  const now = Date.now();
-
-  orders.forEach(o => {
-    if (o.customer === name && o.completedAt) {
-      const time = new Date(o.completedAt).getTime();
-      if ((now - time) < cooldownDays * 86400 * 1000) {
-        o.completedAt = new Date(now - cooldownDays * 86400 * 1000 - 1).toISOString();
-        updated++;
-      }
-    }
-  });
-
-  if (updated > 0) {
-    save(KEY, orders);
-    alert(`已讓「${name}」恢復提醒 (${updated} 筆訂單更新)`);
-    refreshReminders?.();
-    renderMutedList?.();
-  }
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  if (typeof renderMutedList === 'function') renderMutedList();
-});
 </script></head>
 <body>
 <header>
@@ -482,6 +422,7 @@ window.addEventListener('DOMContentLoaded', () => {
         1) 點「狀況」籤可快速切換（排定 → 完成 → 未完成）。
         2) 直接點「日期」或「時間」欄可快速編輯；Enter/失焦儲存，Esc 取消。 3) 右上可用關鍵字搜尋（姓名/電話/地址），結果會自動高亮。
         未填日期會標記 <span class="badge-soft">未排期</span>、未填時間會標記 <span class="badge-soft">未排定</span>。</div>
+
 <details class="accordion" id="contactsAcc">
 <summary>📇 通訊錄管理（週期批次調整）</summary>
 <div class="content">
@@ -548,7 +489,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <!-- 訂單表單（中） -->
 <details ="true"="" class="accordion" id="orderAccordion"><summary><span id="formTitle">新增 / 編輯訂單</span></summary><div class="content">
 <form id="orderForm">
-<input id="id" type="hidden"/>
+<input id="id" type="hidden">
 <div class="row">
 <div class="col" style="grid-column:span 6">
 <label>作業人員</label>
@@ -559,20 +500,20 @@ window.addEventListener('DOMContentLoaded', () => {
 </div>
 <div class="col" style="grid-column:span 3">
 <label>日期（可留空，之後再填）</label>
-<input id="date" type="date"/>
-</div>
+<input id="date" type="date">
+</input></div>
 <div class="col" style="grid-column:span 3">
 <label>時間</label>
-<input id="time" type="time"/>
-</div>
+<input id="time" type="time">
+</input></div>
 </div>
 <div class="row">
 <div class="col" style="grid-column:span 6">
 <label>姓名（支援通訊錄）</label>
-<input id="customer" list="contactsDL" placeholder="客戶姓名" type="text">
+<input id="customer" list="contactsDL" placeholder="客戶姓名" type="text"/>
 <datalist id="contactsDL"></datalist>
 <div class="tiny">選既有客戶會自動帶出電話/地址</div>
-</input></div>
+</div>
 <div class="col" style="grid-column:span 3">
 <label>LINE or Fackbook ID</label>
 <input id="lineId" type="text"/>
@@ -741,7 +682,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <button class="danger" disabled="" id="deleteBtn" type="button">刪除此訂單</button>
 </div>
 </div>
-</form>
+</input></form>
 </div></details>
 <!-- 支出模組（下）以手風琴呈現 -->
 <details =""="" class="accordion" id="expenseAcc">
@@ -814,14 +755,6 @@ window.addEventListener('DOMContentLoaded', () => {
 </div>
 </div>
 </details>
-<details class="accordion" id="mutedListAcc">
-<summary>🔕 靜音名單（可恢復提醒）</summary>
-<div class="content">
-<div class="tiny muted" style="margin-bottom:8px">以下為已進入通知冷卻期的客戶，可手動恢復提醒。</div>
-<div id="mutedListContainer">載入中...</div>
-</div>
-</details>
-
 </main>
 <input accept=".json" class="hidden" id="filePicker" type="file"/>
 <input accept=".json" class="hidden" id="filePickerExp" type="file"/>
