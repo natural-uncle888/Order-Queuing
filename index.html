@@ -63,6 +63,7 @@
 <h2>訂單列表</h2>
 <div class="body">
 <div class="sum" id="summary"></div>
+
 <div class="hr"></div>
 <div class="small muted">小技巧：
         1) 點「狀況」籤可快速切換（排定 → 完成 → 未完成）。
@@ -169,6 +170,19 @@
 <input class="hidden tiny" id="contactTimeNote" placeholder="請輸入指定時間（如 9:00–12:00 或 週三晚上）" type="text"/>
 </div>
 </div>
+
+<div class="row" id="reminderRow">
+  <div class="col" style="grid-column:span 6">
+    <div id="reminderToolbar" class="toolbar" style="gap:8px; align-items:center; flex-wrap:wrap">
+      <label class="pill"><input id="reminderEnabled" type="checkbox" checked> <span>啟用提醒</span></label>
+      <label class="muted">提醒週期（月）</label>
+      <input id="reminderMonths" type="number" min="0" step="1" placeholder="例如 12" class="tiny compact" value="24">
+      <label class="muted">下次提醒</label>
+      <input id="nextReminder" type="text" disabled class="tiny">
+    </div>
+  </div>
+</div>
+
 <div class="row">
 <div class="col" style="grid-column:span 6">
 <label>冷氣位於樓層（可複選）</label>
@@ -271,21 +285,6 @@
 <div class="row">
 <div class="col" style="grid-column:span 3">
 <label>總金額（自動）</label>
-
-<div class="row">
-  <div class="col" style="grid-column:span 3">
-    <label>啟用提醒</label>
-    <label class="pill"><input id="reminderEnabled" type="checkbox"> <span>啟用</span></label>
-  </div>
-  <div class="col" style="grid-column:span 3">
-    <label>提醒週期（月）</label>
-    <input id="reminderMonths" type="number" min="0" step="1" placeholder="例如 12">
-  </div>
-  <div class="col" style="grid-column:span 3">
-    <label>下次提醒（自動計算）</label>
-    <input id="nextReminder" type="text" disabled>
-  </div>
-</div>
 
 <input id="total" readonly="" type="number"/>
 </div>

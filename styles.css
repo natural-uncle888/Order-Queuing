@@ -369,3 +369,9 @@ th.col-total, td.col-total {
 @media (max-width: 768px) {
   .card.due-panel { display: none; } /* 手機隱藏，避免擠版；如需手機也顯示可移除此行 */
 }
+
+
+/* === Reminder inline toolbar (under 居住地型態) === */
+#reminderToolbar input.compact { width: 100px; }
+#reminderToolbar input[disabled] { width: 140px; }
+#reminderToolbar .muted { opacity: .75; font-size: 12px; }

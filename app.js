@@ -240,9 +240,9 @@ durationMinutes: +$('durationMinutes').value || 120,
       setChecked('contactTime', o.contactTimes||[]); $('contactTimeNote').value=o.contactTimeNote||''; $('contactTimeNote').classList.toggle('hidden', !(o.contactTimes||[]).includes('時間指定'));
       setChecked('acFloor', o.acFloors||[]); setChecked('washerFloor', o.washerFloors||[]);
       updateAbove5Visibility();
-      (function(){ const nd = nextDueDateForCustomer($('customer').value); $('nextReminder').value = nd ? fmtDate(nd) : ''; })();
+      (function(){ const name=$('customer').value; const months=(+$('reminderMonths').value||24); const last=lastCompletedDateForCustomer(name); const nd=(last && months)? addMonths(last, months): null; $('nextReminder').value = nd ? fmtDate(nd) : ''; })();
       $('contactMethod').value=o.contactMethod||contactList[0]; $('status').value=o.status||'排定';
-      $('reminderEnabled').checked=!!o.reminderEnabled; $('reminderMonths').value=+o.reminderMonths||'';
+      $('reminderEnabled').checked=(o.reminderEnabled!==undefined? !!o.reminderEnabled : true); $('reminderMonths').value=(o.reminderMonths!==undefined? +o.reminderMonths : 24);
       $('acFloorAbove').value=o.acFloorAbove||''; $('washerFloorAbove').value=o.washerFloorAbove||'';
       $('acSplit').value=o.acSplit||0; $('acDuct').value=o.acDuct||0; $('washerTop').value=o.washerTop||0; $('waterTank').value=o.waterTank||0;
       $('pipesAmount').value=o.pipesAmount||0; $('antiMold').value=o.antiMold||0; $('ozone').value=o.ozone||0;
@@ -913,8 +913,8 @@ $('importJson').addEventListener('click', importJSON);
 
 
       // Recompute nextReminder when customer/reminderMonths change
-      $('customer').addEventListener('blur', ()=>{ const nd = nextDueDateForCustomer($('customer').value); $('nextReminder').value = nd ? fmtDate(nd) : ''; });
-      $('reminderMonths').addEventListener('input', ()=>{ const nd = nextDueDateForCustomer($('customer').value); $('nextReminder').value = nd ? fmtDate(nd) : ''; });
+      $('customer').addEventListener('blur', ()=>{ const name=$('customer').value; const months=(+$('reminderMonths').value||24); const last=lastCompletedDateForCustomer(name); const nd=(last && months)? addMonths(last, months): null; $('nextReminder').value = nd ? fmtDate(nd) : ''; });
+      $('reminderMonths').addEventListener('input', ()=>{ const name=$('customer').value; const months=(+$('reminderMonths').value||24); const last=lastCompletedDateForCustomer(name); const nd=(last && months)? addMonths(last, months): null; $('nextReminder').value = nd ? fmtDate(nd) : ''; });
 
       // expenses
       $('expenseForm').addEventListener('submit', saveExpense);
