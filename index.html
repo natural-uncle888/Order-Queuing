@@ -323,47 +323,6 @@ tr.overdue td{background:#fef2f2}
 
 </style>
 <script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11">
-
-function renderContactsTable() {
-  const tbody = $('contactsTable').querySelector('tbody');
-  tbody.innerHTML = contacts.map((c, idx) => {
-    const cy = c.periodYears ?? '';
-    return `
-      <tr>
-        <td>${escapeHtml(c.name || '')}</td>
-        <td>${escapeHtml(c.phone || '')}</td>
-        <td>${escapeHtml(c.address || '')}</td>
-        <td>${escapeHtml(c.lineId || '')}</td>
-        <td><input type="number" min="1" step="1" data-idx="${idx}" value="${cy}" style="width:80px"/></td>
-      </tr>
-    `;
-  }).join('');
-}
-
-function saveContactPeriods() {
-  const inputs = $('contactsTable').querySelectorAll('input[type="number"]');
-  let changed = 0;
-  inputs.forEach(input => {
-    const idx = +input.dataset.idx;
-    const val = input.value.trim();
-    if (val === '') {
-      delete contacts[idx].periodYears;
-      changed++;
-    } else {
-      const n = +val;
-      if (!isNaN(n) && n > 0) {
-        contacts[idx].periodYears = n;
-        changed++;
-      }
-    }
-  });
-  save(CONTACTS_KEY, contacts);
-  alert(`已儲存 ${changed} 筆通訊錄變更`);
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  if (typeof renderContactsTable === 'function') renderContactsTable();
-});
 </script></head>
 <body>
 <header>
@@ -422,45 +381,23 @@ window.addEventListener('DOMContentLoaded', () => {
         1) 點「狀況」籤可快速切換（排定 → 完成 → 未完成）。
         2) 直接點「日期」或「時間」欄可快速編輯；Enter/失焦儲存，Esc 取消。 3) 右上可用關鍵字搜尋（姓名/電話/地址），結果會自動高亮。
         未填日期會標記 <span class="badge-soft">未排期</span>、未填時間會標記 <span class="badge-soft">未排定</span>。</div>
-
-<details class="accordion" id="contactsAcc">
-<summary>📇 通訊錄管理（週期批次調整）</summary>
-<div class="content">
-<div class="toolbar" style="margin-bottom:12px">
-<button class="primary" onclick="saveContactPeriods()">儲存變更</button>
-<span class="tiny muted">提示：欄位留空代表使用全域預設週期</span>
-</div>
-<div style="overflow:auto; max-height:400px">
-<table id="contactsTable">
-<thead>
-<tr>
-<th>姓名</th>
-<th>電話</th>
-<th>地址</th>
-<th>LINE ID</th>
-<th>週期(年)</th>
-</tr>
-</thead>
-<tbody></tbody>
-</table>
-</div>
-</div>
-</details>
 <div style="overflow:auto;margin-top:8px">
+
 <!-- Reminder / Alerts -->
 <section class="reminder-panel" id="reminderPanel">
-<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
-<div><span style="font-weight:700">到期提醒</span> <span class="badge muted" id="reminderCount">0</span></div>
-<div class="settings-row">
-<label>週期(年)：<input id="remYears" min="1" step="1" style="width:70px" type="number" value="2"/></label>
-<label>提前提醒(天)：<input id="leadDays" min="0" step="1" style="width:90px" type="number" value="30"/>
-<label>通知冷卻(天)：<input id="cooldownDays" min="0" step="1" style="width:90px" type="number" value="7"/></label></label>
-<button class="inline-btn" id="saveRemPrefs" type="button">儲存</button>
-<button class="inline-btn" id="pushNotify" type="button">桌面通知</button>
-</div>
-</div>
-<div class="tiny" id="reminderList">目前沒有即將到期的客戶。</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+    <div><span style="font-weight:700">到期提醒</span> <span id="reminderCount" class="badge muted">0</span></div>
+    <div class="settings-row">
+      <label>週期(年)：<input id="remYears" type="number" min="1" step="1" style="width:70px" value="2"></label>
+      <label>提前提醒(天)：<input id="leadDays" type="number" min="0" step="1" style="width:90px" value="30">
+      <label>通知冷卻(天)：<input id="cooldownDays" type="number" min="0" step="1" style="width:90px" value="7"></label></label>
+      <button id="saveRemPrefs" type="button" class="inline-btn">儲存</button>
+      <button id="pushNotify" type="button" class="inline-btn">桌面通知</button>
+    </div>
+  </div>
+  <div id="reminderList" class="tiny">目前沒有即將到期的客戶。</div>
 </section>
+
 <table id="ordersTable">
 <thead>
 <tr>
@@ -489,7 +426,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <!-- 訂單表單（中） -->
 <details ="true"="" class="accordion" id="orderAccordion"><summary><span id="formTitle">新增 / 編輯訂單</span></summary><div class="content">
 <form id="orderForm">
-<input id="id" type="hidden">
+<input id="id" type="hidden"/>
 <div class="row">
 <div class="col" style="grid-column:span 6">
 <label>作業人員</label>
@@ -500,12 +437,12 @@ window.addEventListener('DOMContentLoaded', () => {
 </div>
 <div class="col" style="grid-column:span 3">
 <label>日期（可留空，之後再填）</label>
-<input id="date" type="date">
-</input></div>
+<input id="date" type="date"/>
+</div>
 <div class="col" style="grid-column:span 3">
 <label>時間</label>
-<input id="time" type="time">
-</input></div>
+<input id="time" type="time"/>
+</div>
 </div>
 <div class="row">
 <div class="col" style="grid-column:span 6">
@@ -523,11 +460,13 @@ window.addEventListener('DOMContentLoaded', () => {
 <input id="phone" placeholder="0912-345-678（可含 - ）" type="text"/>
 </div>
 </div>
+
 <div class="col" style="grid-column:span 3">
-<label>客製週期(年)</label>
-<input id="customerPeriodYears" min="1" placeholder="例如 2" step="1" type="number"/>
-<div class="tiny">留空則使用全域設定</div>
+  <label>客製週期(年)</label>
+  <input id="customerPeriodYears" type="number" min="1" step="1" placeholder="例如 2" />
+  <div class="tiny">留空則使用全域設定</div>
 </div>
+
 <div class="row">
 <div class="col" style="grid-column:span 5">
 <label>安排時段（可複選）</label>
@@ -682,7 +621,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <button class="danger" disabled="" id="deleteBtn" type="button">刪除此訂單</button>
 </div>
 </div>
-</input></form>
+</form>
 </div></details>
 <!-- 支出模組（下）以手風琴呈現 -->
 <details =""="" class="accordion" id="expenseAcc">
