@@ -1,0 +1,307 @@
+:root {
+  --bg: #e0e7ef;
+  --card: #ffffff;
+  --muted: #374151;
+  --text: #111827;
+  --primary: #2563eb;
+  --primary-weak: #bfdbfe;
+  --accent: #059669;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --border: #94a3b8;
+  --radius: 16px;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+}
+
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:system-ui, -apple-system, "Noto Sans TC", Segoe UI, Roboto, Helvetica, Arial;
+      background:linear-gradient(180deg,var(--bg),#eef2ff);
+      color:var(--text);
+    }
+    header{
+      position:sticky;top:0;z-index:10;
+      background:rgba(255,255,255,.8);backdrop-filter:saturate(1.2) blur(8px);
+      border-bottom:1px solid var(--border);
+    }
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    .stack{display:flex;flex-direction:column;gap:16px}
+    .card{
+      background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);
+    }
+    .card h2{margin:0;padding:14px 16px;border-bottom:1px solid var(--border);font-size:18px}
+    .card .body{padding:16px}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;margin-bottom:12px}
+    @media (max-width:900px){.row{grid-template-columns:repeat(6,1fr)}}
+    label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+    input,select,textarea,button{font:inherit}
+    input[type="text"],input[type="date"],input[type="time"],input[type="number"],select,textarea{
+      width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;outline:none;
+    }
+    textarea{min-height:72px;resize:vertical}
+    .muted{color:var(--muted)}
+    .pill{
+      border-radius:999px;padding:8px 12px;border:1px solid var(--border);background:#fff;display:inline-flex;gap:8px;align-items:center
+    }
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px}
+    .toolbar button, .toolbar .right button{
+      padding:10px 14px;border-radius:999px;border:1px solid var(--border);
+      background:#fff;color:var(--text);cursor:pointer
+    }
+    .toolbar .primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .toolbar .accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .toolbar .warn{background:var(--warn);color:#111}
+    .toolbar .danger{background:var(--danger);color:#fff}
+    .toolbar .right{margin-left:auto;display:flex;gap:8px}
+    table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border-radius:12px;border:1px solid var(--border)}
+    thead th{background:#f3f4f6;color:#374151;font-weight:600;text-align:left;font-size:12px;padding:10px;border-bottom:1px solid var(--border)}
+    tbody td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+    tbody tr:hover{background:#fafafa}
+    .status{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid;cursor:pointer;user-select:none}
+    .status.P排定{color:#2563eb;border-color:#93c5fd;background:#eff6ff}
+    .status.C完成{color:#10b981;border-color:#a7f3d0;background:#ecfdf5}
+    .status.N未完成{color:#ef4444;border-color:#fecaca;background:#fef2f2}
+    .sum{display:flex;gap:12px;flex-wrap:wrap}
+    .sum .box{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 14px;min-width:170px;box-shadow:var(--shadow)}
+    .number{font-size:18px;font-weight:700}
+    .small{font-size:12px}
+    .hr{height:1px;background:var(--border);margin:8px 0 16px}
+    .inline-btn{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#fff;color:var(--text);cursor:pointer;margin-left:8px}
+    .right-align{text-align:right}
+    .editable{cursor:pointer}
+    .editable:hover{background:#f9fafb}
+    .checkpill{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#fff;cursor:pointer;user-select:none}
+    .checkpill.on{background:#ecfdf5;border-color:#a7f3d0;color:#059669}
+    .checkpill.off{background:#f9fafb;color:#6b7280}
+    .icon-btn{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#fff;cursor:pointer}
+    .icon-btn.danger{background:#fee2e2;border-color:#fecaca;color:#b91c1c}
+    .hidden{display:none !important}
+    .checkbox-group{display:flex;gap:8px;flex-wrap:wrap}
+    .checkbox{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);padding:6px 10px;border-radius:999px;background:#fff}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media (max-width:900px){.two-col{grid-template-columns:1fr}}
+    mark{background:#fde68a;padding:0 .15em;border-radius:3px}
+    .badge-soft{display:inline-block;padding:2px 8px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:12px}
+    .lock-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#6b7280}
+    .tiny{font-size:11px;color:#6b7280}
+    /* Accordion */
+    details.accordion{border:1px solid var(--border);border-radius:var(--radius);background:var(--card);box-shadow:var(--shadow)}
+    details.accordion > summary{list-style:none;cursor:pointer;padding:14px 16px;border-radius:var(--radius);font-weight:600}
+    details.accordion[open] > summary{border-bottom:1px solid var(--border)}
+    details.accordion .content{padding:16px}
+  
+/* 增強按鈕視覺 */
+button, .toolbar button {
+  transition: background 0.2s ease, color 0.2s ease;
+}
+button:hover, .toolbar button:hover {
+  filter: brightness(1.1);
+}
+
+/* 主要按鈕強化 */
+.toolbar .primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.toolbar .primary:hover {
+  background: #1e40af;
+}
+
+/* 強調按鈕（如 Google/新增） */
+.toolbar .accent {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.toolbar .accent:hover {
+  background: #047857;
+}
+
+/* 危險按鈕 hover 強化 */
+.toolbar .danger:hover {
+  background: #b91c1c;
+}
+
+/* 清晰的狀態圓角標籤 */
+.status {
+  font-weight: bold;
+  border-width: 2px;
+}
+
+/* 表格行 hover 高亮 */
+tbody tr:hover {
+  background: #f0f9ff;
+}
+
+/* 搜尋高亮 mark 顏色加深 */
+mark {
+  background: #facc15;
+  color: #000;
+}
+
+/* 強化輸入欄位與卡片對比 */
+input[type="text"],
+input[type="date"],
+input[type="time"],
+input[type="number"],
+select,
+textarea {
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+/* hover 狀態加強 */
+button:hover,
+.toolbar button:hover {
+  filter: brightness(1.12);
+}
+
+/* 表格 hover 更明顯 */
+tbody tr:hover {
+  background: #dbeafe;
+}
+
+/* 強化表格標頭對比 */
+thead th {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+/* 搜尋 mark 強化 */
+mark {
+  background: #facc15;
+  padding: 0 0.2em;
+  border-radius: 2px;
+}
+
+/* === Mobile Enhancements === */
+@media (max-width: 768px) {
+  .wrap { padding: 12px; }
+  .toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .toolbar .right { margin-left: 0; width: 100%; display: flex; flex-direction: column; gap: 8px; }
+  .toolbar button, .toolbar .right button { width: 100%; min-height: 44px; font-size: 16px; }
+  .pill { width: 100%; }
+  .pill input, .pill select { width: 100% !important; }
+  .row { grid-template-columns: 1fr !important; }
+  .two-col { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 600px) {
+  /* Turn the big table into stacked cards */
+  table { border: 0; }
+  table thead { display: none; }
+  table tr { display: block; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 8px; box-shadow: var(--shadow); }
+  table td { display: block; border: none; padding: 8px; text-align: left; }
+  table td.right-align { text-align: left; }
+  table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  /* Make pills/buttons comfortable to tap */
+  button, .toolbar button { min-height: 44px; }
+  input, select, textarea { font-size: 16px; } /* avoid iOS zoom */
+}
+
+
+/* === Prune columns & mobile keep-list (injected) === */
+th.col-slot, td.col-slot,
+th.col-total, td.col-total {
+  display: none !important;
+}
+
+@media (max-width: 600px) {
+  table td { display: none !important; }
+  table td.keep-mobile { display: block !important; }
+}
+
+
+@media (max-width: 768px) {
+  .toolbar {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
+    width: 100%;
+  }
+  .toolbar > * {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+  .toolbar .pill,
+  .toolbar label.pill {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    height: 44px;
+    padding: 0 16px !important;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 15px;
+    gap: 0;
+    margin: 0;
+    width: 100% !important;
+  }
+  .toolbar label.pill input[type="checkbox"] {
+    margin-right: 8px;
+    width: 22px;
+    height: 22px;
+    accent-color: #2563eb;
+    flex-shrink: 0;
+  }
+  .toolbar label.pill span {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 15px;
+    line-height: 1;
+    padding: 0;
+    margin: 0;
+    display: block;
+  }
+  /* 所有按鈕都維持同寬同高 */
+  .toolbar .right {
+    display: contents !important;
+    width: 100%;
+    margin-left: 0;
+    gap: 0 !important;
+  }
+  .toolbar .right button {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 44px;
+    font-size: 15px;
+    margin: 0 !important;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* === Desktop vertical character display for 客戶/狀況/確認/報價單 === */
+@media (min-width: 768px) {
+  td.vtext {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    line-height: 1.1;
+  }
+}
