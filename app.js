@@ -108,6 +108,17 @@ function findContactByPhone(phone){
     
 
 // ---------- Reminder Utilities ----------
+
+function reminderFlagsForCustomer(name){
+  const n=(name||'').trim(); if(!n) return {muted:false, notified:false};
+  const related = orders
+    .filter(o => (o.customer||'').trim()===n)
+    .sort((a,b)=> new Date(b.createdAt||b.date||b.completedAt||0) - new Date(a.createdAt||a.date||a.completedAt||0));
+  if(related.length===0) return {muted:false, notified:false};
+  const last = related[0];
+  return { muted: !!last.reminderMuted, notified: !!last.reminderNotified };
+}
+
 function addMonths(dateStr, months){
   if(!dateStr) return null;
   const d = new Date(dateStr);
@@ -210,6 +221,9 @@ function gatherForm(){
     
         reminderEnabled: !!($('reminderEnabled')?.checked),
         reminderMonths: +$('reminderMonths')?.value || 0,
+
+        reminderNotified: !!($('reminderNotified')?.checked),
+        reminderMuted: !!($('reminderMuted')?.checked),
 acFloorAbove: (document.querySelector('input[type="checkbox"][data-name="acFloor"][value="5F以上"]:checked') ? ($('acFloorAbove')?.value||'').trim() : ''),
     washerFloorAbove: (document.querySelector('input[type="checkbox"][data-name="washerFloor"][value="5F以上"]:checked') ? ($('washerFloorAbove')?.value||'').trim() : ''),
 durationMinutes: +$('durationMinutes').value || 120,
@@ -243,6 +257,7 @@ durationMinutes: +$('durationMinutes').value || 120,
       (function(){ const name=$('customer').value; const months=(+$('reminderMonths').value||24); const last=lastCompletedDateForCustomer(name); const nd=(last && months)? addMonths(last, months): null; $('nextReminder').value = nd ? fmtDate(nd) : ''; })();
       $('contactMethod').value=o.contactMethod||contactList[0]; $('status').value=o.status||'排定';
       $('reminderEnabled').checked=(o.reminderEnabled!==undefined? !!o.reminderEnabled : true); $('reminderMonths').value=(o.reminderMonths!==undefined? +o.reminderMonths : 24);
+      $('reminderNotified').checked=!!o.reminderNotified; $('reminderMuted').checked=!!o.reminderMuted;
       $('acFloorAbove').value=o.acFloorAbove||''; $('washerFloorAbove').value=o.washerFloorAbove||'';
       $('acSplit').value=o.acSplit||0; $('acDuct').value=o.acDuct||0; $('washerTop').value=o.washerTop||0; $('waterTank').value=o.waterTank||0;
       $('pipesAmount').value=o.pipesAmount||0; $('antiMold').value=o.antiMold||0; $('ozone').value=o.ozone||0;
@@ -821,7 +836,9 @@ function refreshDueSoonPanel(){
     const name = (o.customer||'').trim();
     if(!name || seen.has(name)) return;
     seen.add(name);
-    const nd = nextDueDateForCustomer(name);
+    const flags = reminderFlagsForCustomer(name);
+    if(flags.muted) return;
+          const nd = nextDueDateForCustomer(name);
     if(!nd) return;
     const days = Math.floor((nd - today)/(24*60*60*1000));
     if(days <= 30){
@@ -848,11 +865,12 @@ function refreshDueSoonPanel(){
   listEl.innerHTML = top.map(it => {
     const dueStr = fmtDate(it.due);
     const badge = it.days <= 0 ? `<span class="badge due">⚠️ 到期 ${dueStr}</span>` : `<span class="badge soon">⏰ ${it.days} 天後到期</span>`;
+    const notified = reminderFlagsForCustomer(it.name).notified ? `<span class="badge muted">已通知</span>` : '';
     const lastStr = it.last ? `最近完成：${(it.last||'').slice(0,10)}` : '';
     const phoneStr = it.phone ? it.phone : '';
     const addrStr = it.address ? it.address : '';
     return `<div class="row">
-      <div class="name">${it.name} ${badge}</div>
+      <div class="name">${it.name} ${badge} ${notified}</div>
       <div class="muted">${lastStr}</div>
       <div class="muted">${phoneStr}</div>
       <div class="muted">${addrStr}</div>
@@ -1033,6 +1051,8 @@ $('importJson').addEventListener('click', importJSON);
           const name = (o.customer||'').trim();
           if(!name || seen.has(name)) return;
           seen.add(name);
+          const flags = reminderFlagsForCustomer(name);
+    if(flags.muted) return;
           const nd = nextDueDateForCustomer(name);
           if(!nd) return;
           const days = Math.floor((nd - today)/(24*60*60*1000));

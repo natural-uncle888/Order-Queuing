@@ -375,3 +375,18 @@ th.col-total, td.col-total {
 #reminderToolbar input.compact { width: 100px; }
 #reminderToolbar input[disabled] { width: 140px; }
 #reminderToolbar .muted { opacity: .75; font-size: 12px; }
+
+
+/* === Reminder flags styling === */
+.pill.danger { border-color: #ef4444; color: #b91c1c; }
+.badge.muted { background:#f3f4f6; color:#6b7280; }
+
+
+/* === Improve contrast for red '不再提醒' control === */
+.pill.danger,
+.icon-btn.danger {
+  background: #ef4444;
+  color: #fff !important;
+  border-color: #ef4444;
+}
+.pill.danger span { color: #fff !important; }
