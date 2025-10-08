@@ -308,6 +308,19 @@ th.col-total, td.col-total {
     text-overflow: ellipsis;
   }
 }
+
+/* --- Reminders (Due Service) --- */
+.badge{display:inline-block;min-width:1.5em;padding:.1em .5em;border-radius:9999px;background:#ef4444;color:#fff;font-weight:700;font-size:.85em;vertical-align:middle;text-align:center}
+.badge.muted{background:#9ca3af}
+.reminder-panel{border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin:10px 0;background:#fff}
+.reminder-item{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px dashed #eee}
+.reminder-item:last-child{border-bottom:none}
+.reminder-title{font-weight:600}
+tr.due td{background:#fff7ed}
+tr.overdue td{background:#fef2f2}
+.settings-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.settings-row label{font-size:.9em;color:#374151}
+
 </style>
 <script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11">
 </script></head>
@@ -369,6 +382,22 @@ th.col-total, td.col-total {
         2) 直接點「日期」或「時間」欄可快速編輯；Enter/失焦儲存，Esc 取消。 3) 右上可用關鍵字搜尋（姓名/電話/地址），結果會自動高亮。
         未填日期會標記 <span class="badge-soft">未排期</span>、未填時間會標記 <span class="badge-soft">未排定</span>。</div>
 <div style="overflow:auto;margin-top:8px">
+
+<!-- Reminder / Alerts -->
+<section class="reminder-panel" id="reminderPanel">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+    <div><span style="font-weight:700">到期提醒</span> <span id="reminderCount" class="badge muted">0</span></div>
+    <div class="settings-row">
+      <label>週期(年)：<input id="remYears" type="number" min="1" step="1" style="width:70px" value="2"></label>
+      <label>提前提醒(天)：<input id="leadDays" type="number" min="0" step="1" style="width:90px" value="30">
+      <label>通知冷卻(天)：<input id="cooldownDays" type="number" min="0" step="1" style="width:90px" value="7"></label></label>
+      <button id="saveRemPrefs" type="button" class="inline-btn">儲存</button>
+      <button id="pushNotify" type="button" class="inline-btn">桌面通知</button>
+    </div>
+  </div>
+  <div id="reminderList" class="tiny">目前沒有即將到期的客戶。</div>
+</section>
+
 <table id="ordersTable">
 <thead>
 <tr>
@@ -431,6 +460,13 @@ th.col-total, td.col-total {
 <input id="phone" placeholder="0912-345-678（可含 - ）" type="text"/>
 </div>
 </div>
+
+<div class="col" style="grid-column:span 3">
+  <label>客製週期(年)</label>
+  <input id="customerPeriodYears" type="number" min="1" step="1" placeholder="例如 2" />
+  <div class="tiny">留空則使用全域設定</div>
+</div>
+
 <div class="row">
 <div class="col" style="grid-column:span 5">
 <label>安排時段（可複選）</label>
@@ -703,7 +739,7 @@ th.col-total, td.col-total {
     const CONTACTS_KEY = 'yl_clean_contacts_v1';
     let contacts = load(CONTACTS_KEY, []); // {id,name,phone,address,lineId}
     function normalizePhone(p){ return (p||'').replace(/\D+/g,''); }
-    function upsertContact(name, phone, address, lineId){
+    function upsertContact(name, phone, address, lineId, periodYears){
       const np = normalizePhone(phone);
       if(!name && !np) return;
       const idx = contacts.findIndex(c => normalizePhone(c.phone)===np && np);
@@ -712,6 +748,7 @@ th.col-total, td.col-total {
         contacts[idx].name = contacts[idx].name || name;
         contacts[idx].address = contacts[idx].address || address;
         contacts[idx].lineId = contacts[idx].lineId || lineId;
+        if(periodYears){ contacts[idx].periodYears = +periodYears; }
       }else{
         contacts.push({id: crypto.randomUUID(), name: name||'', phone: phone||'', address: address||'', lineId: lineId||''});
       }
@@ -807,7 +844,9 @@ th.col-total, td.col-total {
       $('deleteBtn').disabled=!o.id; $('formTitle').textContent=o.id?'編輯訂單':'新增訂單';
       setFormLock(!!o.locked);
       if(o.completedAt){ $('lockInfo').textContent = '完成於 ' + new Date(o.completedAt).toLocaleString(); }
-    }
+    
+      try{ const c = (typeof findContactByName==='function')? findContactByName(o.customer):null; if(c && $('customerPeriodYears')) $('customerPeriodYears').value = c.periodYears || ''; }catch{}
+}
     function recalcTotals(){ const total=calcTotal(gatherForm()); $('total').value=total; const discount=Math.max(0,+$('discount').value||0); $('netTotal').value=Math.max(0,total-discount); }
 
     function setFormLock(lock){
@@ -833,7 +872,9 @@ th.col-total, td.col-total {
         const s1=!staffF || o.staff===staffF; const s2=!statusF || o.status===statusF;
         const condQuery = tokens.length===0 || tokens.every(t => hay(o).includes(t));
         const condRange = !range || (o.completedAt && (now - new Date(o.completedAt).getTime()) <= (+range)*24*60*60*1000);
-        if(!o.date){ return showUndated && s1 && s2 && condQuery && condRange; }
+        if(!o.date){ return showUndated && s1 && s2 && condQuery && condRange; 
+      refreshReminders();
+}
         const d=new Date(o.date); const ym=(d.getFullYear()===y && (d.getMonth()+1)===m);
         return ym && s1 && s2 && condQuery && condRange;
       }).sort((a,b)=>{
@@ -848,6 +889,8 @@ th.col-total, td.col-total {
 
       filtered.forEach((o,idx)=>{
         const tr=document.createElement('tr');
+        tr.setAttribute('data-customer', o.customer||'');
+        tr.setAttribute('data-address', o.address||'');
         const dateCell = o.date ? o.date : '<span class="badge-soft">未排期</span>';
         tr.innerHTML=`
           <td class="small muted" data-label="#">${idx+1}</td>
@@ -1202,7 +1245,16 @@ th.col-total, td.col-total {
     // ---------- Orders save/delete/export/import ----------
     function saveOrder(e){
       e.preventDefault();
-      recalcTotals();
+      
+      try{
+        const name = $('customer')?.value||'';
+        const phone = $('phone')?.value||'';
+        const address = $('address')?.value||'';
+        const lineId = $('lineId')?.value||'';
+        const periodYears = $('customerPeriodYears')?.value||'';
+        if(name || phone){ upsertContact(name, phone, address, lineId, periodYears); save(CONTACTS_KEY, contacts); }
+      }catch(e){ console.warn('upsertContactFromForm failed', e); }
+recalcTotals();
       const data=gatherForm(); // 日期可留空
       // handle completedAt & lock
       if(data.status==='完成'){
@@ -1309,6 +1361,234 @@ th.col-total, td.col-total {
     });
     function addExpCat(){ const name=prompt('輸入新花費類別：')?.trim(); if(!name) return; if(!expCats.includes(name)){ expCats.push(name); save(EXP_CAT_KEY, expCats); initExpenseCats(); } $('expCategory').value=name; }
 
+    
+    // ---------- Reminders (Due Service) ----------
+    const REM_PREF_KEY = 'yl_clean_reminder_prefs_v1';
+    function loadRemPrefs(){
+      const d = load(REM_PREF_KEY, {years:2, leadDays:30, cooldownDays:7, notifications:false});
+      if($('remYears')) $('remYears').value = d.years;
+      if($('leadDays')) $('leadDays').value = d.leadDays;
+      if($('cooldownDays')) $('cooldownDays').value = d.cooldownDays||7;
+      return d;
+    }
+    function saveRemPrefs(){
+      const years = +(($('remYears')&&$('remYears').value)||2);
+      const leadDays = +(($('leadDays')&&$('leadDays').value)||30);
+      const cooldownDays = +( ($('cooldownDays')&&$('cooldownDays').value) || 7 );
+      const prefs = {years: Math.max(1, Math.round(years)), leadDays: Math.max(0, Math.round(leadDays)), cooldownDays: Math.max(0, Math.round(cooldownDays)), notifications: notifEnabled};
+      save(REM_PREF_KEY, prefs);
+      refreshReminders();
+      alert('提醒設定已儲存');
+    }
+    function endOfDay(d){ const x=new Date(d); x.setHours(23,59,59,999); return x; }
+    function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+    function addYears(d,n){ const x=new Date(d); x.setFullYear(x.getFullYear()+n); return x; }
+    function parseISO(s){ try{return s?new Date(s):null;}catch{return null;} }
+    function getOrderDate(o){
+      return parseISO(o.completedAt) || (o.date ? new Date(o.date) : null);
+    }
+    function buildLastServiceMap(orders){
+      const map = new Map();
+      for(const o of orders){
+        const d = getOrderDate(o);
+        if(!d) continue;
+        const key = (o.customer||'') + '|' + (o.address||'');
+        const cur = map.get(key);
+        if(!cur || d > cur.lastDate){
+          map.set(key, { 
+            name: o.customer||'(未填姓名)', phone: o.phone||'', address: o.address||'',
+            lastDate: d, lastItem: o, order: o
+          });
+        }
+      }
+      return map;
+    }
+    function computeReminders(){
+      const prefs = loadRemPrefs();
+
+      const contacts = load(CONTACTS_KEY, []);
+      function matchContact(name, address, phone){
+        const np = (phone||'').replace(/\D+/g,'');
+        let found = contacts.find(c => (c.phone||'').replace(/\D+/g,'') === np && np);
+        if(found) return found;
+        found = contacts.find(c => (c.name||'')===name && (c.address||'')===address);
+        if(found) return found;
+        found = contacts.find(c => (c.name||'')===name);
+        return found || null;
+      }
+
+      const orders = load(KEY, []);
+      const map = buildLastServiceMap(orders);
+      const today = new Date();
+      const list = [];
+      map.forEach((v,key)=>{
+        const contact = matchContact(v.name, v.address, v.phone);
+        const years = (contact && +contact.periodYears>0) ? +contact.periodYears : prefs.years;
+        const due = addYears(v.lastDate, years);
+        const warn = addDays(due, -prefs.leadDays);
+        const status = (today >= endOfDay(due)) ? 'overdue' : (today >= warn ? 'due' : 'ok');
+        if(status!=='ok'){
+          list.push({key, status, due, lastDate: v.lastDate, name: v.name, phone: v.phone, address: v.address, order: v.order});
+        }
+      });
+      list.sort((a,b)=> a.due - b.due);
+      return list;
+    }
+    function renderReminderPanel(){
+      const list = computeReminders();
+      const cont = $('reminderList');
+      const badge = $('reminderCount');
+      if(badge){ badge.textContent = String(list.length); badge.classList.toggle('muted', list.length===0); }
+      if(!cont) return;
+      if(list.length===0){ cont.innerHTML = '<div class="tiny">目前沒有即將到期的客戶。</div>'; return; }
+      cont.innerHTML = list.map(it=>{
+        const d = it.due.toISOString().slice(0,10);
+        const last = it.lastDate.toISOString().slice(0,10);
+        const cls = it.status==='overdue'?'⚠️ 逾期':'⏰ 即將到期';
+        const tel = it.phone ? `<a href="tel:${it.phone}">${it.phone}</a>` : '';
+        return `<div class="reminder-item">
+          <div>
+            <div class="reminder-title">${cls}：${it.name}</div>
+            <div class="tiny">${it.address||''}</div>
+            <div class="tiny">上次：${last}｜到期：${d} ｜週期：${(matchContact(it.name,it.address,it.phone)?.periodYears)||load(REM_PREF_KEY,{years:2,leadDays:30}).years} 年 ${tel?('｜電話：'+tel):''}</div>
+          </div>
+          <div class="toolbar" style="gap:6px">
+            <button type="button" class="inline-btn" onclick="openOrderById('${'${it.order.id||\'\'}'}')">查看</button>
+            <button type="button" class="inline-btn" onclick="createDueCalendar('${'${it.name||\'\'}'}','${'${d}'}','${'${it.address||\'\'}'}')">加到行事曆</button>
+          </div>
+        </div>`
+      }).join('');
+    }
+    function applyDueHighlights(){
+      const list = computeReminders();
+      document.querySelectorAll('#ordersTable tbody tr').forEach(tr=>{
+        tr.classList.remove('overdue','due');
+      });
+      for(const it of list){
+        document.querySelectorAll(`#ordersTable tbody tr[data-customer="${'${it.name}'}"][data-address="${'${it.address}'}"]`).forEach(tr=>{
+          tr.classList.add(it.status==='overdue'?'overdue':'due');
+        });
+      }
+    }
+    function openOrderById(id){
+      const orders = load(KEY, []);
+      const o = orders.find(x=>String(x.id)===String(id));
+      if(!o) return;
+      fillForm(o);
+      document.getElementById('orderAccordion')?.setAttribute('open','');
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+    function createDueCalendar(name, dateISO, location){
+      try{
+        const title = (name||'客戶') + '｜例行保養/清洗到期';
+        const start = new Date(dateISO + 'T09:00:00');
+        const end = new Date(dateISO + 'T10:00:00');
+        const ics = [
+          'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//yl-clean//reminder//TW',
+          'BEGIN:VEVENT',
+          'DTSTART:' + start.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z',
+          'DTEND:' + end.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z',
+          'SUMMARY:' + title,
+          'LOCATION:' + (location||''),
+          'DESCRIPTION:系統到期提醒，自動建立。',
+          'END:VEVENT','END:VCALENDAR'
+        ].join('\r\n');
+        const blob = new Blob([ics], {type:'text/calendar'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (title.replace(/[\s\/]/g,'_')) + '.ics';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }catch(e){ console.error(e); alert('建立行事曆事件失敗'); }
+    }
+    let notifEnabled = false;
+    async function ensureNotification(){
+      try{
+        if(!('Notification' in window)) return false;
+        if(Notification.permission === 'granted') return (notifEnabled=true);
+        if(Notification.permission !== 'denied'){
+          const p = await Notification.requestPermission();
+          notifEnabled = (p==='granted');
+          return notifEnabled;
+        }
+      }catch{}
+      return false;
+    }
+    function maybeNotify(){
+      const prefs = loadRemPrefs();
+      if(!prefs.notifications) return;
+      const list = computeReminders();
+      if(list.length===0) return;
+      const top = list[0];
+      const title = (top.status==='overdue'?'逾期':'即將到期') + '｜' + top.name;
+      const body = (top.address||'') + '｜到期：' + top.due.toISOString().slice(0,10);
+      try{ new Notification(title, {body}); }catch{}
+    }
+    
+    // ---------- Reminder acknowledgements & mute ----------
+    function withContacts(fn){
+      const list = load(CONTACTS_KEY, []);
+      const changed = fn(list) || false;
+      if(changed) save(CONTACTS_KEY, list);
+      return list;
+    }
+    function findContactEntry(list, name, address, phone){
+      const np = (phone||'').replace(/\D+/g,'');
+      let c = list.find(x => (x.phone||'').replace(/\D+/g,'')===np && np);
+      if(c) return c;
+      c = list.find(x => (x.name||'')===name && (x.address||'')===address);
+      if(c) return c;
+      c = list.find(x => (x.name||'')===name);
+      return c || null;
+    }
+    function markNotified(name, address, phone){
+      withContacts(list=>{
+        const c = findContactEntry(list, name, address, phone);
+        if(!c) return false;
+        c.reminder = c.reminder || {};
+        c.reminder.lastNotifiedISO = new Date().toISOString();
+        return true;
+      });
+      refreshReminders();
+    }
+    function ignoreThisCycle(name, address, phone, dueISO){
+      withContacts(list=>{
+        const c = findContactEntry(list, name, address, phone);
+        if(!c) return false;
+        c.reminder = c.reminder || {};
+        c.reminder.lastAckDueISO = dueISO;
+        const years = +(c.periodYears||load(REM_PREF_KEY,{years:2}).years)||2;
+        const d = new Date(dueISO); d.setFullYear(d.getFullYear()+years);
+        c.reminder.nextDueOverrideISO = d.toISOString();
+        return true;
+      });
+      refreshReminders();
+    }
+    function muteContact(name, address, phone){
+      withContacts(list=>{
+        const c = findContactEntry(list, name, address, phone);
+        if(!c) return false;
+        c.reminder = c.reminder || {};
+        c.reminder.muted = true;
+        return true;
+      });
+      refreshReminders();
+    }
+    function unmuteContact(name, address, phone){
+      withContacts(list=>{
+        const c = findContactEntry(list, name, address, phone);
+        if(!c || !c.reminder) return false;
+        c.reminder.muted = false;
+        return true;
+      });
+      refreshReminders();
+    }
+
+function refreshReminders(){
+      renderReminderPanel();
+      applyDueHighlights();
+    }
+
     // ---------- Events ----------
     function attachEvents(){
       // order form
@@ -1316,7 +1596,17 @@ th.col-total, td.col-total {
       $('deleteBtn').addEventListener('click', deleteOrder);
       $('resetBtn').addEventListener('click', resetForm);
       $('recalc').addEventListener('click', recalcTotals);
-      ['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount']
+      
+      $('saveRemPrefs')?.addEventListener('click', saveRemPrefs);
+      $('pushNotify')?.addEventListener('click', async ()=>{
+        const ok = await ensureNotification();
+        if(ok){ const prefs = load(REM_PREF_KEY, {years:2,leadDays:30,notifications:false}); prefs.notifications=true; save(REM_PREF_KEY, prefs); alert('已開啟桌面通知'); maybeNotify(); }
+        else { alert('您的瀏覽器不支援或未允許通知'); }
+      });
+      loadRemPrefs();
+      setTimeout(refreshReminders, 0);
+      setInterval(refreshReminders, 60*60*1000);
+['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount']
         .forEach(id => $(id).addEventListener('input', recalcTotals));
       $('newBtn').addEventListener('click', ()=>{ fillForm({}); });
 $('exportJson').addEventListener('click', exportJSON);
@@ -1328,11 +1618,11 @@ $('importJson').addEventListener('click', importJSON);
       // Autofill from contacts when name/phone entered
       $('customer').addEventListener('blur', ()=>{
         const c = findContactByName($('customer').value);
-        if(c){ $('phone').value = c.phone||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
+        if(c){ if($('customerPeriodYears')) $('customerPeriodYears').value = c.periodYears || ''; $('phone').value = c.phone||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
       });
       $('phone').addEventListener('blur', ()=>{
         const c = findContactByPhone($('phone').value);
-        if(c){ if(!$('customer').value) $('customer').value = c.name||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
+        if(c){ if($('customerPeriodYears')) $('customerPeriodYears').value = c.periodYears || ''; if(!$('customer').value) $('customer').value = c.name||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
       });
 
 
