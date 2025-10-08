@@ -2114,6 +2114,20 @@ op.appendChild(calBtn);
     }
 
     if(list){
+    // Empty-state hint
+    if ((due.length + soon.length) === 0 && sum) {
+      const stats = computeReminderStats();
+      const hint = document.createElement('div');
+      hint.className = 'small muted';
+      hint.style.marginTop = '6px';
+      hint.innerHTML = `（沒有可顯示的提醒）<br>
+        總客戶 ${stats.total}，缺少下次到期 ${stats.missingNextDue}，已靜音 ${stats.muted}，暫停中 ${stats.snoozed}。
+        <br>提示：只有 <b>有 nextDueDate</b> 且 <b>未靜音/未暫停</b> 的客戶才會出現在這裡；
+        已到期與 ${stats.soonWindowDays}天內將分別顯示在兩個列表中。`;
+      sum.appendChild(hint);
+    }
+
+
       const row = (c,label,idx)=> `<tr data-phone="${c.phone||''}">
   <td>${label}</td>
   <td><label><input type="checkbox" class="remSel" data-phone="${c.phone||''}"> ${c.name||''}</label></td>
@@ -2247,13 +2261,58 @@ op.appendChild(calBtn);
     return ret;
   };
 
-  document.addEventListener('DOMContentLoaded', function(){
+  attachDiagnosticsButton();
+    document.addEventListener('DOMContentLoaded', function(){
     ensureCycleInput();
     migrateContactsFromOrdersOnce();
     recalcMissingNextDue();
     renderReminderSection();
   });
-})();
+}
+
+  // ---- Diagnostics ----
+  function computeReminderStats(){
+    const all = loadContacts();
+    const today = new Date().toISOString().slice(0,10);
+    const stats = {
+      total: all.length,
+      muted: 0,
+      snoozed: 0,
+      missingNextDue: 0,
+      due: 0,
+      soon: 0,
+      soonWindowDays: REMIND_SOON_DAYS
+    };
+    all.forEach(c=>{
+      if(!c || !c.nextDueDate) { stats.missingNextDue++; return; }
+      if(c.mute===true) { stats.muted++; return; }
+      if(isSnoozed(c)) { stats.snoozed++; return; }
+      const d = daysDiff(today, c.nextDueDate);
+      if(isNaN(d)) return;
+      if(d<=0) stats.due++;
+      else if(d<=REMIND_SOON_DAYS) stats.soon++;
+    });
+    return stats;
+  }
+
+  function attachDiagnosticsButton(){
+    const btn = document.getElementById('remDiagBtn');
+    if(!btn) return;
+    btn.onclick = function(){
+      const stats = computeReminderStats();
+      console.table(stats);
+      alert(
+        '提醒診斷\n' +
+        `總客戶: ${stats.total}\n` +
+        `缺少下次到期: ${stats.missingNextDue}\n` +
+        `已靜音: ${stats.muted}\n` +
+        `暫停中: ${stats.snoozed}\n` +
+        `已到期: ${stats.due}\n` +
+        `${stats.soonWindowDays}天內: ${stats.soon}`
+      );
+    };
+  }
+)();
 </script>
 <!-- END: Reminder Engine (外置區塊 + 自訂週期；不動 Google 相關程式) -->
 
