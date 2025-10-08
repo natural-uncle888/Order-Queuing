@@ -309,7 +309,8 @@ th.col-total, td.col-total {
   }
 }
 </style>
-<script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11">
+<script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </script></head>
 <body>
 <header>
@@ -358,6 +359,38 @@ th.col-total, td.col-total {
 </div>
 </header>
 <main class="wrap stack" style="margin-top:16px">
+<!-- BEGIN: 保養提醒（獨立卡片，位於訂單列表之前） -->
+<section class="card" id="reminderSection">
+  <h2>保養提醒</h2>
+  <div class="body">
+    <div id="reminderSummary" class="sum"></div>
+    <div class="hr"></div>
+    <div id="reminderList" style="overflow:auto">
+<div class="toolbar" id="reminderControls" style="display:flex;gap:12px;align-items:center;margin:8px 0">
+  <div class="pill"><strong>篩選</strong>
+    <select id="reminderFilter">
+      <option value="active">僅顯示有效提醒</option>
+      <option value="all">顯示全部（含靜音/暫停）</option>
+      <option value="muted">只看不再提醒</option>
+      <option value="snoozed">只看暫停中</option>
+    </select>
+  </div>
+  <div class="pill"><strong>快速暫停</strong>
+    <select id="bulkSnooze">
+      <option value="">— 對選取的顧客 —</option>
+      <option value="7">暫停 7 天</option>
+      <option value="30">暫停 30 天</option>
+      <option value="90">暫停 90 天</option>
+    </select>
+  </div>
+  <div class="pill">
+    <button id="bulkUnmute" type="button">恢復提醒</button>
+  </div>
+</div></div>
+  </div>
+</section>
+<!-- END: 保養提醒（獨立卡片，位於訂單列表之前） -->
+
 <!-- 訂單列表（上） -->
 <section class="card">
 <h2>訂單列表</h2>
@@ -395,7 +428,7 @@ th.col-total, td.col-total {
 </div>
 </section>
 <!-- 訂單表單（中） -->
-<details ="true"="" class="accordion" id="orderAccordion"><summary><span id="formTitle">新增 / 編輯訂單</span></summary><div class="content">
+<details class="accordion" id="orderAccordion"><summary><span id="formTitle">新增 / 編輯訂單</span></summary><div class="content">
 <form id="orderForm">
 <input id="id" type="hidden"/>
 <div class="row">
@@ -493,7 +526,7 @@ th.col-total, td.col-total {
 <h3 style="margin:0 0 8px">清洗項目與價格</h3>
 <div class="row">
 <div class="col" style="grid-column:span 6">
-<label>分離式冷氣室內機（每台1800；滿3台每台1500）</label>
+<label><b><span style="color:red;font-size:15px">分離式冷氣室內機（每台1800；滿3台每台1500）</span></b></label>
 <input id="acSplit" min="0" step="1" type="number" value="0"/>
 </div>
 <div class="col" style="grid-column:span 6">
@@ -503,7 +536,7 @@ th.col-total, td.col-total {
 </div>
 <div class="row">
 <div class="col" style="grid-column:span 6">
-<label>直立式洗衣機（每台2000；若同單含冷氣室內機則每台1800）</label>
+<label><b><span style="color:red;font-size:15px">直立式洗衣機（每台2000；若同單含冷氣室內機則每台1800）</span></b></label>
 <input id="washerTop" min="0" step="1" type="number" value="0"/>
 </div>
 <div class="col" style="grid-column:span 6">
@@ -517,7 +550,7 @@ th.col-total, td.col-total {
 <input id="pipesAmount" min="0" step="1" type="number" value="0"/>
 </div>
 <div class="col" style="grid-column:span 6">
-<label>防霉噴劑（每台300；滿5台每台250）</label>
+<label><b><span style="color:red;font-size:15px">防霉噴劑（每台300；滿5台每台250）</span></b></label>
 <input id="antiMold" min="0" step="1" type="number" value="0"/>
 </div>
 </div>
@@ -775,7 +808,6 @@ th.col-total, td.col-total {
     }
     function gatherForm(){
       return {
-    durationMinutes: +$('durationMinutes').value || 120,
     durationMinutes: +$('durationMinutes').value || 120,
         id: $('id').value || crypto.randomUUID(),
         staff:$('staff').value, date:$('date').value, time:$('time').value,
@@ -1934,7 +1966,256 @@ op.appendChild(calBtn);
 </script>
 <!-- ✅ 表單中新增：工作時長欄位 -->
 <!-- ✅ gatherForm() 中補上 -->
-</div></body>
+</div>
+<!-- BEGIN: Reminder Engine (外置區塊 + 自訂週期；不動 Google 相關程式) -->
+<script>
+(function(){
+  // ---- Helpers ----
+  function $(id){ return document.getElementById(id); }
+  function addMonths(dateStr, months){
+    if(!dateStr) return '';
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setMonth(d.getMonth() + (months||0));
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), da = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${da}`;
+  }
+  function daysDiff(fromDateStr, toDateStr){
+    if(!fromDateStr || !toDateStr) return NaN;
+    const a = new Date(fromDateStr + 'T00:00:00').getTime();
+    const b = new Date(toDateStr + 'T00:00:00').getTime();
+    return Math.floor((b - a) / (24*60*60*1000));
+  }
+  const REMIND_SOON_DAYS = 30;
+
+  // ---- Contacts storage (不依賴全域 contacts 陣列，直接用 localStorage，避免衝突) ----
+  const CONTACTS_KEY = (window.CONTACTS_KEY || 'yl_clean_contacts_v1');
+  function loadContacts(){ try{ return JSON.parse(localStorage.getItem(CONTACTS_KEY)||'[]'); }catch(_){ return []; } }
+  function saveContacts(list){ localStorage.setItem(CONTACTS_KEY, JSON.stringify(list)); }
+  function normalizePhone(p){ return (p||'').replace(/\D+/g,''); }
+
+  function upsertContactExtra(name, phone, address, lineId, extra){
+    const list = loadContacts();
+    const np = normalizePhone(phone);
+    const base = { lastCleanDate:'', cycleMonths:24, nextDueDate:'', mute:false, snoozeUntil:'', lastNotified:'' };
+    let idx = -1;
+    if(np) idx = list.findIndex(c=> normalizePhone(c.phone)===np);
+    if(idx>=0){
+      list[idx] = Object.assign({}, base, list[idx], {
+        name: list[idx].name || name,
+        phone: list[idx].phone || phone,
+        address: list[idx].address || address,
+        lineId: list[idx].lineId || lineId
+      }, extra||{});
+    }else{
+      list.push(Object.assign({
+        id: (crypto&&crypto.randomUUID)? crypto.randomUUID(): String(Date.now())+Math.random(),
+        name: name||'', phone: phone||'', address: address||'', lineId: lineId||''
+      }, base, extra||{}));
+    }
+    saveContacts(list);
+  }
+
+  // ---- Compute & render reminder cards ----
+  function isSnoozed(c){
+    if(!c || !c.snoozeUntil) return false;
+    const today = new Date().toISOString().slice(0,10);
+    return c.snoozeUntil >= today;
+  }
+  function computeBuckets(){
+    const list = loadContacts();
+    const todayStr = new Date().toISOString().slice(0,10);
+    const due = [], soon = [];
+    list.forEach(c=>{
+      if(c.mute===true) return;           // 不再提醒 → 排除
+      if(isSnoozed(c)) return;            // 暫停期間 → 排除
+      if(!c || !c.nextDueDate) return;
+      const d = daysDiff(todayStr, c.nextDueDate);
+      if(isNaN(d)) return;
+      if(d<=0) due.push(Object.assign({days:d}, c));
+      else if(d<=REMIND_SOON_DAYS) soon.push(Object.assign({days:d}, c));
+    });
+    // sort by nextDueDate
+    due.sort((a,b)=> (a.nextDueDate||'').localeCompare(b.nextDueDate||''));
+    soon.sort((a,b)=> (a.nextDueDate||'').localeCompare(b.nextDueDate||''));
+    return { due, soon };
+  }
+
+  function renderReminderSection(){
+    const sec = $('reminderSection'); if(!sec) return;
+    const sum = $('reminderSummary');
+    const list = $('reminderList');
+    let { due, soon } = computeBuckets();
+    const filterSel = document.getElementById('reminderFilter');
+    const mode = filterSel ? filterSel.value : 'active';
+    // Re-load full list for filtered views that include muted/snoozed
+    const allList = (function(){ try{return JSON.parse(localStorage.getItem(CONTACTS_KEY)||'[]');}catch(_){return [];} })();
+    if(mode==='muted'){
+      due = allList.filter(c=>c.mute===true);
+      soon = [];
+    } else if(mode==='snoozed'){
+      const today = new Date().toISOString().slice(0,10);
+      due = allList.filter(c=>c.snoozeUntil && c.snoozeUntil>=today);
+      soon = [];
+    } else if(mode==='all'){
+      // Show active due/soon plus muted/snoozed appended
+      const today = new Date().toISOString().slice(0,10);
+      const muted = allList.filter(c=>c.mute===true).map(c=>Object.assign({labelOverride:'不再提醒'}, c));
+      const snoozed = allList.filter(c=>c.snoozeUntil && c.snoozeUntil>=today).map(c=>Object.assign({labelOverride:'暫停中'}, c));
+      // Keep active buckets, append others to 'soon' bucket for display
+      soon = soon.concat(snoozed, muted);
+    }
+
+    if(sum){
+      sum.innerHTML = '';
+      const mk = (t,v,h='')=>{ const box=document.createElement('div'); box.className='box'; box.innerHTML = `<div class="small muted">${t}</div><div class="number">${v}</div>${h?`<div class="small muted">${h}</div>`:''}`; return box; };
+      sum.appendChild(mk('到期', due.length));
+      sum.appendChild(mk('30天內', soon.length));
+      sum.appendChild(mk('提醒總數', due.length + soon.length));
+    }
+
+    if(list){
+      const row = (c,label,idx)=> `<tr data-phone="${c.phone||''}">
+  <td>${label}</td>
+  <td><label><input type="checkbox" class="remSel" data-phone="${c.phone||''}"> ${c.name||''}</label></td>
+  <td>${c.phone||''}</td>
+  <td>${c.address||''}</td>
+  <td>${c.lastCleanDate||''}</td>
+  <td>${c.cycleMonths||''}</td>
+  <td>${c.nextDueDate||''}</td>
+  <td>
+    <button class="remAction" data-act="notified" data-phone="${c.phone||''}">已通知</button>
+    <button class="remAction" data-act="snooze7" data-phone="${c.phone||''}">暫停7天</button>
+    <button class="remAction" data-act="snooze30" data-phone="${c.phone||''}">暫停30天</button>
+    <button class="remAction" data-act="mute" data-phone="${c.phone||''}">不再提醒</button>
+    <button class="remAction" data-act="unmute" data-phone="${c.phone||''}">恢復</button>
+  </td>
+</tr>`;
+      list.innerHTML = `
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr><th>狀態</th><th>客戶</th><th>電話</th><th>地址</th><th>上次清洗</th><th>週期(月)</th><th>下次到期</th><th>操作</th></tr></thead>
+          <tbody>
+            ${due.map((c,i)=>row(c, c.labelOverride||'到期', i)).join('')}
+            ${soon.map((c,i)=>row(c, c.labelOverride||'即將到期', i)).join('')}
+          </tbody>
+        </table>`;
+      bindReminderActions();
+    }
+  }
+
+  // --- Actions / utilities ---
+  function updateContactByPhone(phone, updater){
+    const list = loadContacts();
+    const idx = list.findIndex(c => (c.phone||'') === phone);
+    if(idx>=0){
+      updater(list[idx]);
+      saveContacts(list);
+    }
+  }
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+  function bindReminderActions(){
+    const container = document.getElementById('reminderList');
+    if(!container) return;
+    // Row action buttons
+    container.querySelectorAll('.remAction').forEach(btn=>{
+      btn.addEventListener('click', function(){
+        const act = this.getAttribute('data-act');
+        const phone = this.getAttribute('data-phone');
+        if(!phone) return;
+        if(act==='notified'){
+          updateContactByPhone(phone, c => { c.lastNotified = todayStr(); });
+        }else if(act==='snooze7'){
+          updateContactByPhone(phone, c => { c.snoozeUntil = addMonths(todayStr(), 0); c.snoozeUntil = new Date(Date.now()+7*86400000).toISOString().slice(0,10); });
+        }else if(act==='snooze30'){
+          updateContactByPhone(phone, c => { c.snoozeUntil = new Date(Date.now()+30*86400000).toISOString().slice(0,10); });
+        }else if(act==='mute'){
+          updateContactByPhone(phone, c => { c.mute = true; });
+        }else if(act==='unmute'){
+          updateContactByPhone(phone, c => { c.mute = false; c.snoozeUntil=''; });
+        }
+        renderReminderSection();
+      });
+    });
+    // Bulk controls
+    const bulkSnooze = document.getElementById('bulkSnooze');
+    if(bulkSnooze){
+      bulkSnooze.onchange = function(){
+        const days = parseInt(this.value||'0',10);
+        if(!days) return;
+        const sel = [...container.querySelectorAll('.remSel:checked')].map(cb=>cb.getAttribute('data-phone'));
+        sel.forEach(phone=> updateContactByPhone(phone, c=>{ c.snoozeUntil = new Date(Date.now()+days*86400000).toISOString().slice(0,10);}));
+        this.value = '';
+        renderReminderSection();
+      };
+    }
+    const bulkUnmute = document.getElementById('bulkUnmute');
+    if(bulkUnmute){
+      bulkUnmute.onclick = function(){
+        const sel = [...container.querySelectorAll('.remSel:checked')].map(cb=>cb.getAttribute('data-phone'));
+        sel.forEach(phone=> updateContactByPhone(phone, c=>{ c.mute=false; c.snoozeUntil=''; }));
+        renderReminderSection();
+      };
+    }
+    const filterSel = document.getElementById('reminderFilter');
+    if(filterSel){
+      filterSel.onchange = renderReminderSection;
+    }
+  }
+  // ---- Inject a small "保養週期(月)" input into the order form toolbar (右側) ----
+  function ensureCycleInput(){
+    if(document.getElementById('cycleMonths')) return; // already exists
+    const right = document.querySelector('#orderForm .toolbar .right');
+    if(!right) return;
+    const wrap = document.createElement('div');
+    wrap.style.display='inline-block';
+    wrap.style.marginRight='8px';
+    wrap.innerHTML = '<label style="margin-right:4px;">保養週期(月)</label><input id="cycleMonths" type="number" min="1" step="1" value="24" style="width:80px">';
+    right.prepend(wrap);
+  }
+
+  // ---- Non-invasive saveOrder hook：先擷取表單資料，再呼叫原本的 saveOrder，最後刷新提醒 ----
+  const originalSaveOrder = window.saveOrder;
+  window.saveOrder = function(e){
+    // 預先擷取表單資料（原本 saveOrder 儲存後會清表單）
+    let data = {};
+    try{ if(typeof window.gatherForm==='function') data = window.gatherForm() || {}; }catch(_){ data = {}; }
+    const cm = +(document.getElementById('cycleMonths')?.value || 24);
+
+    // 呼叫原本邏輯
+    let ret;
+    if(typeof originalSaveOrder === 'function'){
+      ret = originalSaveOrder.apply(this, arguments);
+    }
+
+    // 若本次為「完成」且有日期，更新該客戶的到期欄位
+    try{
+      if(data && data.status==='完成' && data.date){
+        const nextDue = addMonths(data.date, cm);
+        upsertContactExtra(data.customer, data.phone, data.address, data.lineId, {
+          lastCleanDate: data.date,
+          cycleMonths: cm,
+          nextDueDate: nextDue
+        });
+      }else if(data){
+        // 至少記住週期設定
+        upsertContactExtra(data.customer, data.phone, data.address, data.lineId, { cycleMonths: cm });
+      }
+    }catch(_){ /* ignore */ }
+
+    // 重新渲染提醒卡片
+    renderReminderSection();
+    return ret;
+  };
+
+  document.addEventListener('DOMContentLoaded', function(){
+    ensureCycleInput();
+    renderReminderSection();
+  });
+})();
+</script>
+<!-- END: Reminder Engine (外置區塊 + 自訂週期；不動 Google 相關程式) -->
+
+</body>
 </html>
 <script>
 // 強制手風琴預設收合（解決部分瀏覽器 <details> 預設展開問題）
