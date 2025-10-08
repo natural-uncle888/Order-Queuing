@@ -2016,6 +2016,46 @@ op.appendChild(calBtn);
   }
 
   // ---- Compute & render reminder cards ----
+  // ---- One-time migration & backfill ----
+  function recalcMissingNextDue(){
+    const list = loadContacts();
+    let changed = 0;
+    list.forEach(c => {
+      if (!c.nextDueDate && c.lastCleanDate && (c.cycleMonths || c.cycleMonths === 0)) {
+        const cm = +c.cycleMonths || 24;
+        c.nextDueDate = addMonths(c.lastCleanDate, cm);
+        changed++;
+      }
+    });
+    if (changed) saveContacts(list);
+    return changed;
+  }
+
+  function migrateContactsFromOrdersOnce(){
+    try{
+      const FLAG = 'yl_contacts_migrated_v1';
+      if(localStorage.getItem(FLAG)) return 0;
+      const orders = JSON.parse(localStorage.getItem('yl_clean_orders_v1')||'[]');
+      let changed = 0;
+      orders.forEach(o=>{
+        if(!o) return;
+        // 只取已完成且有日期的訂單
+        if(o.status==='完成' && o.date){
+          const cm = +(document.getElementById('cycleMonths')?.value || 24);
+          const nextDue = addMonths(o.date, cm);
+          upsertContactExtra(o.customer, o.phone, o.address, o.lineId, {
+            lastCleanDate: o.date,
+            cycleMonths: cm,
+            nextDueDate: nextDue
+          });
+          changed++;
+        }
+      });
+      localStorage.setItem(FLAG, '1');
+      return changed;
+    }catch(_){ return 0; }
+  }
+
   function isSnoozed(c){
     if(!c || !c.snoozeUntil) return false;
     const today = new Date().toISOString().slice(0,10);
@@ -2069,7 +2109,7 @@ op.appendChild(calBtn);
       sum.innerHTML = '';
       const mk = (t,v,h='')=>{ const box=document.createElement('div'); box.className='box'; box.innerHTML = `<div class="small muted">${t}</div><div class="number">${v}</div>${h?`<div class="small muted">${h}</div>`:''}`; return box; };
       sum.appendChild(mk('到期', due.length));
-      sum.appendChild(mk('30天內', soon.length));
+      sum.appendChild(mk(`${REMIND_SOON_DAYS}天內`, soon.length));
       sum.appendChild(mk('提醒總數', due.length + soon.length));
     }
 
@@ -2209,6 +2249,8 @@ op.appendChild(calBtn);
 
   document.addEventListener('DOMContentLoaded', function(){
     ensureCycleInput();
+    migrateContactsFromOrdersOnce();
+    recalcMissingNextDue();
     renderReminderSection();
   });
 })();
