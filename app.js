@@ -5,7 +5,7 @@
     const pad2 = n => n.toString().padStart(2,'0');
     const SLOT_OPTS = ['平日','假日','上午','下午','皆可','日期指定'];
     const CONTACT_TIME_OPTS = ['平日','假日','上午','下午','晚上','皆可','時間指定'];
-    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','透天（同一樓層）','大樓（同一樓層）'];
+    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','有電梯'];
     const STATUS_FLOW = ['排定','完成','未完成'];
 
     function renderChecks(containerId, options, name){
@@ -1582,3 +1582,50 @@ window.addEventListener('DOMContentLoaded', () => {
   if (order) order.open = false;
   if (exp) exp.open = false;
 });
+
+// === Year-to-date stats for "查看年度資料" ===
+function computeYearStats(){
+  const now = new Date();
+  const yearSel = $('yearSel');
+  const y = yearSel ? (parseInt(yearSel.value, 10) || now.getFullYear()) : now.getFullYear();
+  const start = new Date(y, 0, 1);
+
+  let end;
+  if (y < now.getFullYear()) {
+    end = new Date(y, 11, 31, 23, 59, 59, 999);
+  } else if (y === now.getFullYear()) {
+    end = now;
+  } else {
+    end = new Date(y, 11, 31, 23, 59, 59, 999);
+  }
+
+  const src = Array.isArray(window.orders) ? window.orders : [];
+  let count = 0, gross = 0, discounted = 0, cost = 0;
+  for (const o of src) {
+    if (!o || !o.date) continue;
+    const d = new Date(o.date);
+    if (isNaN(d)) continue;
+    if (d < start || d > end) continue;
+    count += 1;
+    const a = Number(o.amount) || 0;
+    const dsc = (o.discounted == null ? a : Number(o.discounted) || 0);
+    const c = Number(o.cost) || 0;
+    gross += a; discounted += dsc; cost += c;
+  }
+  const net = discounted - cost;
+  if ($('mOrders')) $('mOrders').textContent = String(count);
+  if ($('mGross')) $('mGross').textContent = gross.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
+  if ($('mDiscounted')) $('mDiscounted').textContent = discounted.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
+  if ($('mCost')) $('mCost').textContent = cost.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
+  if ($('mNet')) $('mNet').textContent = net.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
+}
+
+(function(){
+  const btn = $('recalc'); // 年度區塊的「計算」按鈕
+  if (btn && !btn._boundYStats) {
+    btn.addEventListener('click', computeYearStats);
+    btn._boundYStats = true;
+  }
+  if ($('yearSel')) $('yearSel').addEventListener('change', computeYearStats);
+  if ($('monthSel')) $('monthSel').addEventListener('change', computeYearStats);
+})();
