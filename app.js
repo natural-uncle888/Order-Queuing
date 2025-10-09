@@ -1,4 +1,98 @@
 // ---------- Utilities ----------
+
+// === Multi-phone helpers ===
+function createPhoneRow(value, removable){
+  const row = document.createElement('div');
+  row.className = 'phone-row';
+  const input = document.createElement('input');
+  input.className = 'phone-input';
+  input.type = 'text';
+  input.placeholder = '輸入電話';
+  if (value) input.value = value;
+  row.appendChild(input);
+  if (removable){
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'phone-remove';
+    btn.setAttribute('aria-label', '刪除電話');
+    btn.textContent = '−';
+    row.appendChild(btn);
+  }
+  return row;
+}
+
+function renderPhonesFromString(s){
+  const c = document.getElementById('phoneContainer');
+  if (!c) return;
+  c.innerHTML = '';
+  const parts = (s||'').split('/').map(x=>x.trim()).filter(Boolean);
+  if (parts.length === 0) {
+    c.appendChild(createPhoneRow('', false));
+  } else {
+    parts.forEach((p, idx)=>{
+      c.appendChild(createPhoneRow(p, idx > 0)); // 第2個開始可移除
+    });
+  }
+}
+
+function ensurePhoneDelegates(){
+  const c = document.getElementById('phoneContainer');
+  if (!c) return;
+  // 移除事件（委派）
+  c.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.phone-remove');
+    if (!btn) return;
+    const row = btn.closest('.phone-row');
+    if (!row) return;
+    // 移除該列
+    row.remove();
+    // 確保至少一個輸入框存在，且第一個沒有移除鍵
+    const rows = c.querySelectorAll('.phone-row');
+    if (rows.length === 0){
+      c.appendChild(createPhoneRow('', false));
+    } else {
+      rows.forEach((r, i)=>{
+        const rm = r.querySelector('.phone-remove');
+        if (i === 0) {
+          if (rm) rm.remove();
+        } else {
+          if (!r.querySelector('.phone-remove')) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'phone-remove';
+            btn.setAttribute('aria-label', '刪除電話');
+            btn.textContent = '−';
+            r.appendChild(btn);
+          }
+        }
+      });
+    }
+  });
+}
+function getPhones(){
+  return Array.from(document.querySelectorAll('.phone-input'))
+    .map(i=>i.value.trim())
+    .filter(Boolean)
+    .join(' / ');
+}
+function setFirstPhone(v){
+  let input = document.querySelector('.phone-input');
+  const pc = document.getElementById('phoneContainer');
+  if(!input){
+    if(pc){
+      input = document.createElement('input');
+      input.className='phone-input'; input.type='text'; input.placeholder='輸入電話';
+      pc.appendChild(input);
+    } else {
+      return; // 沒有容器就不處理
+    }
+  }
+  input.value = v || '';
+}
+function hasAnyPhone(){
+  return Array.from(document.querySelectorAll('.phone-input')).some(i=>i.value.trim());
+}
+
     const $ = (id) => document.getElementById(id);
     const fmtCurrency = n => Number(n||0).toLocaleString('zh-TW', {style:'currency', currency:'TWD', maximumFractionDigits:0});
     const today = new Date();
@@ -244,7 +338,7 @@ durationMinutes: +$('durationMinutes').value || 120,
         id: $('id').value || crypto.randomUUID(),
         staff:$('staff').value, date:$('date').value, time:$('time').value,
         confirmed:$('confirmed')?.checked||false, quotationOk:$('quotationOk')?.checked||false,
-        customer:$('customer').value.trim(), lineId:$('lineId').value.trim(), phone:$('phone').value.trim(),
+        customer:$('customer').value.trim(), lineId:$('lineId').value.trim(), phone:getPhones().trim(),
         slots:getChecked('slot'), slotNote:$('slotNote')?.value.trim()||'', address:$('address').value.trim(),
         residenceType:$('residenceType')?.value||'', residenceOther:$('residenceOther')?.value.trim()||'',
         contactTimes:getChecked('contactTime'), contactTimeNote:$('contactTimeNote')?.value.trim()||'',
@@ -262,7 +356,7 @@ durationMinutes: +$('durationMinutes').value || 120,
       $('id').value=o.id||''; $('staff').value=o.staff||staffList[0];
       $('date').value=o.date||''; $('time').value=o.time||'';
       $('confirmed').checked=!!o.confirmed; $('quotationOk').checked=!!o.quotationOk;
-      $('customer').value=o.customer||''; $('lineId').value=o.lineId||''; $('phone').value=o.phone||'';
+      $('customer').value=o.customer||''; $('lineId').value=o.lineId||''; renderPhonesFromString(o.phone||'');
       setChecked('slot', o.slots||[]); $('slotNote').value=o.slotNote||''; $('slotNote').classList.toggle('hidden', !((o.slots||[]).includes('日期指定') || (o.slots||[]).includes('時間指定'))); $('address').value=o.address||'';
       $('residenceType').value=o.residenceType||''; $('residenceOther').value=o.residenceOther||''; $('residenceOther').classList.toggle('hidden', (o.residenceType||'')!=='其他');
       setChecked('contactTime', o.contactTimes||[]); $('contactTimeNote').value=o.contactTimeNote||''; $('contactTimeNote').classList.toggle('hidden', !(o.contactTimes||[]).includes('時間指定'));
@@ -931,7 +1025,7 @@ $('importJson').addEventListener('click', importJSON);
       $('addContactMethod').addEventListener('click', addContact);
       
       // Autofill from contacts when name/phone entered
-      $('customer').addEventListener('blur', ()=>{ const c = findContactByName($('customer').value); if(c){ if ($('phone').dataset.touched !== '1' && !$('phone').value) $('phone').value = c.phone||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
+      $('customer').addEventListener('blur', ()=>{ const c = findContactByName($('customer').value); if(c){ if ($('phone').dataset.touched !== '1' && !getPhones()) getPhones() = c.phone||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
       });
       // ---- phone touched guard (so user can keep it empty) ----
 try {
@@ -939,22 +1033,26 @@ try {
   $('phone').addEventListener('input', ()=>{ $('phone').dataset.touched = '1'; });
 } catch(e) { /* ignore if element missing */ }
 // ---------------------------------------------------------
-$('phone').addEventListener('blur', ()=>{
-        const c2 = findContactByLineId($('lineId').value);
-        if(c2){ if(!$('customer').value) $('customer').value = c2.name||''; if(!$('address').value) $('address').value = c2.address||''; if ($('phone').dataset.touched !== '1' && !$('phone').value) $('phone').value = c2.phone || ''; }
-      });
-      $('lineId').addEventListener('blur', ()=>{
+const pc = document.getElementById('phoneContainer');
+if (pc) {
+  pc.addEventListener('blur', (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains('phone-input')) {
+      const val = e.target.value;
+      const c = findContactByPhone(val);
+      if (c) {
+        if (!$('customer').value) $('customer').value = c.name || '';
+        if (!$('address').value) $('address').value = c.address || '';
+        if (!$('lineId').value) $('lineId').value = c.lineId || '';
+      }
+    }
+  }, true);
+}
+$('lineId').addEventListener('blur', ()=>{
         const c3 = findContactByLineId($('lineId').value);
-        if(c3){ if(!$('customer').value) $('customer').value = c3.name||''; if(!$('address').value) $('address').value = c3.address||''; if ($('phone').dataset.touched !== '1' && !$('phone').value) $('phone').value = c3.phone || ''; }
+        if(c3){ if(!$('customer').value) $('customer').value = c3.name||''; if(!$('address').value) $('address').value = c3.address||''; if ($('phone').dataset.touched !== '1' && !getPhones()) setFirstPhone(c3.phone || ''); }
       });
-      $('phone').addEventListener('blur', ()=>{
-        const c = findContactByPhone($('phone').value);
-        if(c){ if(!$('customer').value) $('customer').value = c.name||''; if(!$('address').value) $('address').value = c.address||''; if(!$('lineId').value) $('lineId').value = c.lineId||''; }
-      });
-
-
-
-      // Recompute nextReminder when customer/reminderMonths change
+      // removed: phone blur handler (replaced by delegation)
+// Recompute nextReminder when customer/reminderMonths change
       $('customer').addEventListener('blur', ()=>{ const name=$('customer').value; const months=(+$('reminderMonths').value||24); const last=lastCompletedDateForCustomer(name); const nd=(last && months)? addMonths(last, months): null; $('nextReminder').value = nd ? fmtDate(nd) : ''; });
       $('reminderMonths').addEventListener('input', ()=>{ const name=$('customer').value; const months=(+$('reminderMonths').value||24); const last=lastCompletedDateForCustomer(name); const nd=(last && months)? addMonths(last, months): null; $('nextReminder').value = nd ? fmtDate(nd) : ''; });
 
@@ -993,7 +1091,7 @@ $('phone').addEventListener('blur', ()=>{
         copyOrderToForm(last);
       });
       $('copyFromHistoryBtn').addEventListener('click', ()=>{
-        const np = normalizePhone($('phone').value);
+        const np = normalizePhone(getPhones());
         let cand = null;
         if(np){ cand = [...orders].filter(o=> normalizePhone(o.phone)===np).sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''))[0]; }
         if(!cand && $('customer').value){ cand = [...orders].filter(o=> (o.customer||'')=== $('customer').value.trim()).sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''))[0]; }
@@ -1346,10 +1444,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // ---- concatenated from inline <script> blocks ----
 
-let tokenClient;
+var gTokenClient = null;
 
 function initGoogle() {
-  tokenClient = google.accounts.oauth2.initTokenClient({
+  gTokenClient = google.accounts.oauth2.initTokenClient({
     client_id: '894514639805-g3073pmjvadbasfp1g25r24rjhl9iacb.apps.googleusercontent.com',
     scope: 'https://www.googleapis.com/auth/drive.file',
     callback: async (tokenResponse) => {
@@ -1379,8 +1477,8 @@ function initGoogle() {
 }
 
 function initGoogleBackup() {
-  if (!tokenClient) initGoogle();
-  tokenClient.requestAccessToken();
+  if (!gTokenClient) initGoogle();
+  gTokenClient.requestAccessToken();
 }
 function extractCityDistrict(address) {
   if (!address) return { city: '', district: '' };
@@ -1516,7 +1614,7 @@ function handleUploadWithAuth(orderData) {
   if (gToken) {
     uploadEventToCalendar(orderData);
   } else {
-    const tokenClient = google.accounts.oauth2.initTokenClient({
+    gTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPES,
       callback: (tokenResponse) => {
@@ -1524,7 +1622,7 @@ function handleUploadWithAuth(orderData) {
         uploadEventToCalendar(orderData);
       }
     });
-    tokenClient.requestAccessToken();
+    gTokenClient.requestAccessToken();
   }
 }
 
@@ -1594,3 +1692,31 @@ function displayStaff(name) {
 const renderStaffCell = (cell, staffName) => {
   cell.innerHTML = displayStaff(staffName);
 };
+
+// === bootstrap for multi-phone UI ===
+window.addEventListener('load', () => {
+  try {
+    const ensureOnePhone = () => {
+      const c = document.getElementById('phoneContainer');
+      if (!c) return;
+      if (!c.querySelector('.phone-input')) {
+        const rows = c.querySelectorAll('.phone-row');
+        const row = createPhoneRow('', true);
+        c.appendChild(row);
+      }
+    };
+
+    const addBtn = document.getElementById('addPhoneBtn');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        const c = document.getElementById('phoneContainer');
+        if (!c) return;
+        const rows = c.querySelectorAll('.phone-row');
+        const row = createPhoneRow('', true);
+        c.appendChild(row);
+      });
+    }
+    ensureOnePhone();
+    ensurePhoneDelegates();
+  } catch (e) { /* noop */ }
+});

@@ -394,3 +394,23 @@ th.col-total, td.col-total {
 /* === Staff icon styles (v2) === */
 .staff-cell { text-align: center; }
 .staff-icon { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; vertical-align: middle; }
+
+
+/* === Multi-phone UI === */
+#phoneContainer { display:flex; flex-direction:column; gap:8px; }
+.phone-input { width:100%; }
+#addPhoneBtn { margin-top:4px; background: var(--primary); color:#fff; border:none; border-radius:8px; padding:6px 12px; cursor:pointer; }
+
+/* === Multi-phone rows with remove button === */
+#phoneContainer { display: flex; flex-direction: column; gap: 8px; }
+.phone-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.phone-input { width: 100%; }
+.phone-remove {
+  border: 1px solid var(--border, #e5e7eb);
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  line-height: 1;
+}
+.phone-remove:hover { background: #f3f4f6; }
