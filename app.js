@@ -5,7 +5,7 @@
     const pad2 = n => n.toString().padStart(2,'0');
     const SLOT_OPTS = ['平日','假日','上午','下午','皆可','日期指定'];
     const CONTACT_TIME_OPTS = ['平日','假日','上午','下午','晚上','皆可','時間指定'];
-    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','有電梯'];
+    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','透天（同樓層）','透天（同樓層）'];
     const STATUS_FLOW = ['排定','完成','未完成'];
 
     function renderChecks(containerId, options, name){
