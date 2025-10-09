@@ -65,6 +65,10 @@
 <div class="sum" id="summary"></div>
 
 <div class="hr"></div>
+<div class="small muted">小技巧：
+        1) 點「狀況」籤可快速切換（排定 → 完成 → 未完成）。
+        2) 直接點「日期」或「時間」欄可快速編輯；Enter/失焦儲存，Esc 取消。 3) 右上可用關鍵字搜尋（姓名/電話/地址），結果會自動高亮。
+        未填日期會標記 <span class="badge-soft">未排期</span>、未填時間會標記 <span class="badge-soft">未排定</span>。</div>
 <div style="overflow:auto;margin-top:8px">
 
 <!-- 快到期提醒區塊 -->
@@ -387,6 +391,25 @@
 </div>
 </div>
 </details>
+
+<!-- 靜音名單（可展開/收合） -->
+<details id="muteListSection" class="card">
+  <summary class="card-title">🔕 靜音名單（<span id="muteCount">0</span>）</summary>
+  <div class="muted small">以下客戶暫時不會收到自動提醒，可隨時恢復。</div>
+  <div class="table-wrap">
+    <table id="muteListTable" class="table">
+      <thead>
+        <tr>
+          <th>客戶姓名</th>
+          <th>電話</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</details>
+
 </main>
 <input accept=".json" class="hidden" id="filePicker" type="file"/>
 <input accept=".json" class="hidden" id="filePickerExp" type="file"/>

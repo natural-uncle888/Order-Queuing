@@ -473,3 +473,32 @@ th.col-total, td.col-total {
   vertical-align: middle;
 }
 .copy-btn:active { transform: scale(0.92); }
+
+/* === 靜音名單區塊樣式 === */
+#muteListSection {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #fafafa;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+#muteListSection h2 {
+  margin-bottom: 0.5rem;
+  font-size: 1.2rem;
+}
+#muteListSection .small.muted {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-bottom: 0.8rem;
+}
+.unmute-btn {
+  border: 1px solid #ddd;
+  background: #fff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.unmute-btn:hover {
+  background: #f3f3f3;
+}

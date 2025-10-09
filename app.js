@@ -1825,3 +1825,124 @@ document.addEventListener('click', (e) => {
     alert('此瀏覽器不支援自動複製');
   }
 }, true); // ✅ use capture phase
+
+
+
+// === 靜音名單管理 ===
+const MUTE_KEY = 'mutedList';
+function getMutedList() {
+  return JSON.parse(localStorage.getItem(MUTE_KEY) || '[]');
+}
+function saveMutedList(list) {
+  localStorage.setItem(MUTE_KEY, JSON.stringify(list));
+}
+function renderMutedList() {
+  const tbody = document.querySelector('#muteListTable tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  const list = getMutedList();
+  list.forEach((item, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${item.name || ''}</td>
+      <td>${item.phone || ''}</td>
+      <td><button class="unmute-btn" data-index="${i}">恢復提醒</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  updateMuteCountSafely();
+}
+
+document.addEventListener('click', (e) => {
+  const unmute = e.target.closest('.unmute-btn');
+  if (unmute) {
+    const list = getMutedList();
+    const index = parseInt(unmute.dataset.index);
+    if (list[index]) list.splice(index, 1);
+    saveMutedList(list);
+    renderMutedList();
+  }
+});
+
+function muteCustomer(name, phone) {
+  const list = getMutedList();
+  if (!list.some(i => i.phone === phone)) {
+    list.push({ name, phone });
+    saveMutedList(list);
+  }
+  renderMutedList();
+}
+
+window.addEventListener('load', renderMutedList);
+
+
+// === 自動掛載「不再提醒」按鈕事件 ===
+window.addEventListener('load', () => {
+  const btn = document.querySelector('#noRemindBtn');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      const nameInput = document.querySelector('#customerName');
+      const phoneInput = document.querySelector('#customerPhone');
+      const name = nameInput ? nameInput.value.trim() : '';
+      const phone = phoneInput ? phoneInput.value.trim() : '';
+      if (name || phone) {
+        muteCustomer(name, phone);
+        console.log('已加入靜音名單：', name, phone);
+      }
+    });
+  }
+});
+
+
+// === 安全更新靜音統計（避免 list 變數域問題） ===
+function updateMuteCountSafely(){
+  try {
+    const countSpan = document.querySelector('#muteCount');
+    if (countSpan) countSpan.textContent = (getMutedList() || []).length;
+  } catch (e) {}
+}
+
+
+// === Hook "不再提醒" in 編輯訂單畫面 (.pill.danger / .icon-btn.danger) ===
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.pill.danger, .icon-btn.danger');
+  if (!btn) return;
+
+  // 不影響原有行為：等原本邏輯跑完後再加入靜音（若已靜音則不重複）
+  setTimeout(() => {
+    try {
+      // 1) 從編輯表單上抓資料（優先）
+      let name = '';
+      let phone = '';
+
+      const nameEl = document.querySelector('#customer, #customerName, input[name="customer"]');
+      if (nameEl) name = (nameEl.value || nameEl.textContent || '').trim();
+
+      const phoneEls = document.querySelectorAll('.phone-input, #phone, input[name="phone"]');
+      const pvals = Array.from(phoneEls).map(el => (el.value || el.textContent || '').trim()).filter(Boolean);
+      if (pvals.length) phone = pvals.join(' / ');
+
+      // 2) 若表單抓不到，退回該列（保險）
+      if (!name || !phone) {
+        const tr = btn.closest('tr');
+        if (tr) {
+          const tdName  = tr.querySelector('[data-label="客戶"], [data-label="客戶姓名"]');
+          const tdPhone = tr.querySelector('[data-label="電話"]');
+          if (!name  && tdName)  name  = tdName.textContent.replace('📋','').trim();
+          if (!phone && tdPhone) phone = tdPhone.textContent.replace('📋','').trim();
+        }
+      }
+
+      if (name || phone) {
+        muteCustomer(name, phone);
+        if (typeof updateMuteCountSafely === 'function') updateMuteCountSafely();
+        if (typeof renderMutedList === 'function') renderMutedList();
+        console.log('[mute] added from editor:', {name, phone});
+      } else {
+        console.warn('[mute] no name/phone detected from editor');
+      }
+    } catch (err) {
+      console.error('[mute] editor hook failed', err);
+    }
+  }, 0);
+}, true); // 捕獲階段，不干擾既有事件
