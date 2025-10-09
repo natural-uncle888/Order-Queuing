@@ -441,3 +441,22 @@ th.col-total, td.col-total {
 @media (max-width: 768px) {
   .copy-btn { display: inline; }
 }
+
+/* === Copy button stronger visibility (mobile/tablet) === */
+.copy-btn {
+  display: inline-block !important;
+  margin-left: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #6b7280;
+  vertical-align: middle;
+}
+.copy-btn:active { transform: scale(0.92); }
+
+@media (max-width: 992px) {
+  .copy-btn {
+    display: inline-block !important;
+  }
+}

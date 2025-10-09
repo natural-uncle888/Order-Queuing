@@ -426,10 +426,10 @@ durationMinutes: +$('durationMinutes').value || 120,
                ? '<img src="https://res.cloudinary.com/dijzndzw2/image/upload/v1757176751/logo-3_hddq08.png" alt="自然大叔" class="staff-icon">'
               : (o.staff||'')}
           </td>
-          <td class="vtext" data-label="客戶"><span class="copy-target">${o.customer||''}</span><button class="copy-btn" aria-label="複製客戶姓名" title="複製">📋</button></td>
-          <td data-label="電話"><span class="copy-target">${o.phone||''}</span><button class="copy-btn" aria-label="複製電話" title="複製">📋</button></td>
+          <td class="vtext" <td class="vtext" data-label="客戶"><span class="copy-target">${o.customer||''}</span><button class="copy-btn" aria-label="複製客戶姓名" title="複製">📋</button></td>
+          <td <td data-label="電話"><span class="copy-target">${o.phone||''}</span><button class="copy-btn" aria-label="複製電話" title="複製">📋</button></td>
           <td data-label="時段">${(o.slots||[]).join('、')}</td>
-          <td data-label="地址"><span class="copy-target">${o.address||''}</span><button class="copy-btn" aria-label="複製地址" title="複製">📋</button></td>
+          <td <td data-label="地址"><span class="copy-target">${o.address||''}</span><button class="copy-btn" aria-label="複製地址" title="複製">📋</button></td>
           <td class="vtext" data-label="狀況"></td>
           <td class="toggle-confirm vtext" data-label="確認"></td>
           <td class="toggle-quote vtext" data-label="報價單"></td>
