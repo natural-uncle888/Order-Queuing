@@ -414,3 +414,15 @@ th.col-total, td.col-total {
   line-height: 1;
 }
 .phone-remove:hover { background: #f3f4f6; }
+
+/* === Force no-wrap for date/time cells (strong override) === */
+#ordersTable [data-label="日期"],
+#ordersTable [data-label="時間"],
+#ordersTable th[data-label="日期"],
+#ordersTable th[data-label="時間"] {
+  white-space: nowrap !important;
+  word-break: keep-all !important;    /* don't break at hyphens or anywhere */
+  overflow-wrap: normal !important;    /* cancel 'anywhere' if set elsewhere */
+  hyphens: none !important;
+  min-width: 7.5rem;                   /* give a bit of room so it fits */
+}
