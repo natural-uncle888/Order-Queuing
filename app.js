@@ -5,7 +5,7 @@
     const pad2 = n => n.toString().padStart(2,'0');
     const SLOT_OPTS = ['平日','假日','上午','下午','皆可','日期指定'];
     const CONTACT_TIME_OPTS = ['平日','假日','上午','下午','晚上','皆可','時間指定'];
-    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','透天（同樓層）','大樓（同樓層）'];
+    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','透天（同樓層）','透天（同樓層）'];
     const STATUS_FLOW = ['排定','完成','未完成'];
 
     function renderChecks(containerId, options, name){
@@ -323,11 +323,15 @@ durationMinutes: +$('durationMinutes').value || 120,
         const tr=document.createElement('tr');
         const dateCell = o.date ? o.date : '<span class="badge-soft">未排期</span>';
         tr.innerHTML=`
+
           <td class="small muted" data-label="#">${idx+1}</td>
           <td class="editable" data-label="日期">${dateCell}</td>
-          <td class="editable" data-label="時間">${o.time ? o.time : '<span class=\"badge-soft\">未排定</span>'}</td>
-
-          <td data-label="作業人員">${o.staff||''}</td>
+          <td class="editable" data-label="時間">${o.time ? o.time : '<span class="badge-soft">未排定</span>'}</td>
+          <td class="staff-cell" data-label="作業人員">
+            ${o.staff==='自然大叔'
+               ? '<img src="https://res.cloudinary.com/dijzndzw2/image/upload/v1757176751/logo-3_hddq08.png" alt="自然大叔" class="staff-icon">'
+              : (o.staff||'')}
+          </td>
           <td class="vtext" data-label="客戶">${o.customer||''}</td>
           <td data-label="電話">${o.phone||''}</td>
           <td data-label="時段">${(o.slots||[]).join('、')}</td>
@@ -338,7 +342,9 @@ durationMinutes: +$('durationMinutes').value || 120,
           <td class="right-align" data-label="總金額">${fmtCurrency(o.total||0)}</td>
           <td class="right-align" data-label="折後">${fmtCurrency(o.netTotal||0)}</td>
           <td data-label="來源">${o.contactMethod||''}</td>
-          <td class="op-cell" data-label="操作"></td`;
+          <td class="op-cell" data-label="操作"></td>
+    
+`;
         const st=o.status||'排定';
         const span=document.createElement('span');
         span.className='status ' + (st==='排定'?'P排定': st==='完成'?'C完成':'N未完成');

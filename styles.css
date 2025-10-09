@@ -390,3 +390,7 @@ th.col-total, td.col-total {
   border-color: #ef4444;
 }
 .pill.danger span { color: #fff !important; }
+
+/* === Staff icon styles (v2) === */
+.staff-cell { text-align: center; }
+.staff-icon { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; vertical-align: middle; }
