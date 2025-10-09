@@ -99,7 +99,7 @@ function hasAnyPhone(){
     const pad2 = n => n.toString().padStart(2,'0');
     const SLOT_OPTS = ['平日','假日','上午','下午','皆可','日期指定'];
     const CONTACT_TIME_OPTS = ['平日','假日','上午','下午','晚上','皆可','時間指定'];
-    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','透天（同樓層）','大樓（同樓層）'];
+    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','透天（同樓層）','透天（同樓層）'];
     const STATUS_FLOW = ['排定','完成','未完成'];
 
     function renderChecks(containerId, options, name){
@@ -426,10 +426,10 @@ durationMinutes: +$('durationMinutes').value || 120,
                ? '<img src="https://res.cloudinary.com/dijzndzw2/image/upload/v1757176751/logo-3_hddq08.png" alt="自然大叔" class="staff-icon">'
               : (o.staff||'')}
           </td>
-          <td class="vtext" data-label="客戶">${o.customer||''}</td>
-          <td data-label="電話">${o.phone||''}</td>
+          <td class="vtext" data-label="客戶"><span class="copy-target">${o.customer||''}</span><button class="copy-btn" aria-label="複製客戶姓名" title="複製">📋</button></td>
+          <td data-label="電話"><span class="copy-target">${o.phone||''}</span><button class="copy-btn" aria-label="複製電話" title="複製">📋</button></td>
           <td data-label="時段">${(o.slots||[]).join('、')}</td>
-          <td data-label="地址">${o.address||''}</td>
+          <td data-label="地址"><span class="copy-target">${o.address||''}</span><button class="copy-btn" aria-label="複製地址" title="複製">📋</button></td>
           <td class="vtext" data-label="狀況"></td>
           <td class="toggle-confirm vtext" data-label="確認"></td>
           <td class="toggle-quote vtext" data-label="報價單"></td>
@@ -1719,4 +1719,28 @@ window.addEventListener('load', () => {
     ensureOnePhone();
     ensurePhoneDelegates();
   } catch (e) { /* noop */ }
+});
+
+
+// === Copy-to-clipboard (mobile-first) ===
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.copy-btn');
+  if (!btn) return;
+  // Prefer the previous .copy-target in the same cell
+  const cell = btn.closest('td');
+  let text = '';
+  if (cell) {
+    const target = cell.querySelector('.copy-target');
+    if (target) text = target.textContent.trim();
+  }
+  if (!text) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(()=>{
+      btn.dataset.old = btn.textContent;
+      btn.textContent = '✅';
+      setTimeout(()=>{ btn.textContent = btn.dataset.old || '📋'; delete btn.dataset.old; }, 900);
+    }).catch(()=>{
+      alert('無法複製，請手動選取文字');
+    });
+  }
 });
