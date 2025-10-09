@@ -5,7 +5,7 @@
     const pad2 = n => n.toString().padStart(2,'0');
     const SLOT_OPTS = ['平日','假日','上午','下午','皆可','日期指定'];
     const CONTACT_TIME_OPTS = ['平日','假日','上午','下午','晚上','皆可','時間指定'];
-    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','透天（同一樓層）','大樓（同一樓層）'];
+    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','有電梯'];
     const STATUS_FLOW = ['排定','完成','未完成'];
 
     function renderChecks(containerId, options, name){
@@ -1574,3 +1574,17 @@ window.addEventListener('DOMContentLoaded', () => {
   if (order) order.open = false;
   if (exp) exp.open = false;
 });
+
+
+// 🧔 顯示作業人員時自動轉換 icon
+function displayStaff(name) {
+  if (name === "自然大叔") {
+    return '<img src="https://res.cloudinary.com/dijzndzw2/image/upload/v1757176751/logo-3_hddq08.png" alt="自然大叔" style="height:20px;width:20px;border-radius:50%;vertical-align:middle;">';
+  }
+  return name;
+}
+
+// 🧑‍🔧 修改所有需要渲染 staff 的欄位，可使用 innerHTML 而不是 innerText，例如：
+const renderStaffCell = (cell, staffName) => {
+  cell.innerHTML = displayStaff(staffName);
+};
