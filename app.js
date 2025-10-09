@@ -281,10 +281,18 @@ durationMinutes: +$('durationMinutes').value || 120,
       setFormLock(!!o.locked);
       if(o.completedAt){ $('lockInfo').textContent = '完成於 ' + new Date(o.completedAt).toLocaleString(); }
     }
-    function recalcTotals(){ const total=calcTotal(gatherForm()); $('total').value=total; const extra=Math.max(0,+$('extraCharge').value||0); const discount=Math.max(0,+$('discount').value||0); $('netTotal').value=Math.max(0,total+extra-discount); }
+    function recalcTotals(){
+  const f = gatherForm();
+  const total = calcTotal(f);
+  $('total').value = total;
+  const extra = Math.max(0, +($('extraCharge')?.value||0));
+  const discount = Math.max(0, +($('discount')?.value||0));
+  $('netTotal').value = Math.max(0, total + extra - discount);
+}
+
 
     function setFormLock(lock){
-      const ids=['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount','recalc'];
+      const ids=['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','extraCharge','discount','recalcOrder'];
       ids.forEach(id=>{ const el=$(id); if(el){ el.disabled = !!lock; el.readOnly = !!lock; }});
       $('toggleLock').textContent = lock ? '解除鎖定（允許修改）' : '解鎖金額編輯';
       $('lockInfo').textContent = lock ? '金額已鎖定（完成）' : '';
@@ -914,7 +922,7 @@ function refreshDueSoonPanel(){
       $('orderForm').addEventListener('submit', saveOrder);
       $('deleteBtn').addEventListener('click', deleteOrder);
       $('resetBtn').addEventListener('click', resetForm);
-      $('recalc').addEventListener('click', recalcTotals);
+      $('recalcOrder')?.addEventListener('click', recalcTotals);
       ['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount']
         .forEach(id => $(id).addEventListener('input', recalcTotals));
       $('newBtn').addEventListener('click', ()=>{ fillForm({}); });
