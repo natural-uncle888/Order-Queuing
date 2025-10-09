@@ -1744,3 +1744,81 @@ document.addEventListener('click', (e)=>{
     });
   }
 });
+
+
+
+// === 保證顯示版 Copy 按鈕檢查 ===
+window.addEventListener('load', () => {
+  try {
+    // 1. 若沒有 copy-btn 樣式則自動插入
+    if (!document.querySelector('#copy-btn-style')) {
+      const style = document.createElement('style');
+      style.id = 'copy-btn-style';
+      style.textContent = `
+        .copy-btn {
+          display: inline-block !important;
+          margin-left: 6px;
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          font-size: 1rem;
+          color: #6b7280;
+          vertical-align: middle;
+        }
+        .copy-btn:active { transform: scale(0.92); }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // 2. 在表格載入後檢查每列是否已有按鈕
+    const patchCopyButtons = () => {
+      document.querySelectorAll('#ordersTable tbody tr').forEach(tr => {
+        ['客戶', '電話', '地址'].forEach(label => {
+          const td = tr.querySelector(`[data-label="${label}"]`);
+          if (td && !td.querySelector('.copy-btn')) {
+            const span = td.querySelector('.copy-target') || td.querySelector('span') || td.firstChild;
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = '📋';
+            btn.title = '複製';
+            btn.setAttribute('aria-label', '複製');
+            if (span) span.after(btn);
+            else td.appendChild(btn);
+          }
+        });
+      });
+    };
+
+    patchCopyButtons();
+    // 監聽表格變化（當重新載入資料時自動補上）
+    const table = document.querySelector('#ordersTable tbody');
+    if (table && 'MutationObserver' in window) {
+      const mo = new MutationObserver(() => patchCopyButtons());
+      mo.observe(table, { childList: true, subtree: true });
+    }
+
+    // 3. 綁定點擊事件
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.copy-btn');
+      if (!btn) return;
+      const td = btn.closest('td');
+      let text = '';
+      if (td) {
+        const span = td.querySelector('.copy-target') || td.querySelector('span');
+        if (span) text = span.textContent.trim();
+        else text = td.textContent.trim().replace('📋', '').trim();
+      }
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          btn.textContent = '✅';
+          setTimeout(() => (btn.textContent = '📋'), 800);
+        });
+      } else {
+        alert('此瀏覽器不支援自動複製');
+      }
+    });
+  } catch (err) {
+    console.error('copy-btn init failed', err);
+  }
+});
