@@ -1583,13 +1583,13 @@ window.addEventListener('DOMContentLoaded', () => {
   if (exp) exp.open = false;
 });
 
-// === Year-to-date stats for "查看年度資料" ===
+
+// === Year stats for "查看年度資料" (safe injection) ===
 function computeYearStats(){
   const now = new Date();
   const yearSel = $('yearSel');
   const y = yearSel ? (parseInt(yearSel.value, 10) || now.getFullYear()) : now.getFullYear();
   const start = new Date(y, 0, 1);
-
   let end;
   if (y < now.getFullYear()) {
     end = new Date(y, 11, 31, 23, 59, 59, 999);
@@ -1598,8 +1598,7 @@ function computeYearStats(){
   } else {
     end = new Date(y, 11, 31, 23, 59, 59, 999);
   }
-
-  const src = Array.isArray(window.orders) ? window.orders : [];
+  const src = (typeof orders!=='undefined' && Array.isArray(orders) ? orders : (Array.isArray(window.orders)?window.orders:[]));
   let count = 0, gross = 0, discounted = 0, cost = 0;
   for (const o of src) {
     if (!o || !o.date) continue;
@@ -1619,13 +1618,9 @@ function computeYearStats(){
   if ($('mCost')) $('mCost').textContent = cost.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
   if ($('mNet')) $('mNet').textContent = net.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
 }
-
 (function(){
-  const btn = $('recalc'); // 年度區塊的「計算」按鈕
-  if (btn && !btn._boundYStats) {
-    btn.addEventListener('click', computeYearStats);
-    btn._boundYStats = true;
-  }
-  if ($('yearSel')) $('yearSel').addEventListener('change', computeYearStats);
-  if ($('monthSel')) $('monthSel').addEventListener('change', computeYearStats);
-})();
+  const yBtn = $('recalc'); // 年度「計算」按鈕（在查看年度資料區塊）
+  if (yBtn && !yBtn._boundYStats) { yBtn.addEventListener('click', computeYearStats); yBtn._boundYStats = true; }
+  if ($('yearSel') && !$('yearSel')._boundYStats) { $('yearSel').addEventListener('change', computeYearStats); $('yearSel')._boundYStats = true; }
+  if ($('monthSel') && !$('monthSel')._boundYStats) { $('monthSel').addEventListener('change', computeYearStats); $('monthSel')._boundYStats = true; }
+})(); 
