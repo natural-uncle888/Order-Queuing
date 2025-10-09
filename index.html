@@ -2,15 +2,14 @@
 
 <html lang="zh-Hant">
 <head>
-<link rel="stylesheet" href="styles.css">
+<link href="styles.css" rel="stylesheet"/>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <title>自然大叔 ∣ 訂單排程系統</title>
 <link href="https://res.cloudinary.com/dijzndzw2/image/upload/v1757176751/logo-3_hddq08.png" rel="icon" type="image/png"/>
-
 <script defer="True" src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-</script></head>
+</head>
 <body>
 <header>
 <div class="wrap toolbar">
@@ -63,20 +62,128 @@
 <h2>訂單列表</h2>
 <div class="body">
 <div class="sum" id="summary"></div>
-
 <div class="hr"></div>
-<div class="small muted">小技巧：
-        1) 點「狀況」籤可快速切換（排定 → 完成 → 未完成）。
-        2) 直接點「日期」或「時間」欄可快速編輯；Enter/失焦儲存，Esc 取消。 3) 右上可用關鍵字搜尋（姓名/電話/地址），結果會自動高亮。
-        未填日期會標記 <span class="badge-soft">未排期</span>、未填時間會標記 <span class="badge-soft">未排定</span>。</div>
+<div class="small muted"><details class="yearly-stats" id="ys-accordion"><summary class="ys-summary"><span aria-hidden="true" class="ys-chevron">▸</span><span class="ys-title">查看年度資料</span></summary><div class="ys-content"><h2>查看年度資料</h2><div class="ys-controls"><label>年份：<select id="yearSelect"></select></label><button id="recalc">計算</button></div><div class="ys-cards"><div class="ys-card"><div class="ys-card-title">年度訂單數</div><div class="ys-card-value" id="mOrders">--</div></div><div class="ys-card"><div class="ys-card-title">年度總金額</div><div class="ys-card-value" id="mGross">--</div></div><div class="ys-card"><div class="ys-card-title">年度折後總金額</div><div class="ys-card-value" id="mDiscounted">--</div></div><div class="ys-card"><div class="ys-card-title">年度花費</div><div class="ys-card-value" id="mCost">--</div></div><div class="ys-card"><div class="ys-card-title">年度淨收入</div><div class="ys-card-value" id="mNet">--</div></div></div><details><summary>如何提供資料？</summary><p>在任一 script 中賦值 window.orders = [...]：每筆需含 date(YYYY-MM-DD)、amount(原價)、discounted(折後價，可無則視為 amount)、cost(成本/花費，可無則視為 0)。</p><pre>window.orders = [
+  { date: "2025-01-05", amount: 1200, discounted: 1100, cost: 400 },
+  { date: "2025-03-22", amount: 900, discounted: 900, cost: 200 },
+];</pre></details><style>
+/* Accordion Summary */
+.yearly-stats { border: 1px solid #eee; border-radius: 12px; overflow: clip; }
+.yearly-stats > .ys-summary {
+  display:flex; align-items:center; gap:8px; padding:10px 12px;
+  font-weight:600; cursor:pointer; user-select:none;
+  background: linear-gradient(180deg, #fafafa, #f3f3f3);
+}
+.yearly-stats[open] > .ys-summary { background: #f9fafb; border-bottom:1px solid #eee; }
+.ys-chevron { display:inline-block; transition: transform .2s ease; }
+.yearly-stats[open] > .ys-summary .ys-chevron { transform: rotate(90deg); }
+.ys-content { padding: 12px; }
+
+/* Controls & Cards */
+.ys-controls { display:flex; align-items:center; gap: 12px; margin: 8px 0 16px; flex-wrap: wrap; }
+.ys-cards { display:grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 12px; }
+.ys-card { padding: 12px; border: 1px solid #eee; border-radius: 12px; background:#fff; }
+.ys-card-title { font-size: 12px; opacity: 0.7; }
+.ys-card-value { font-size: 20px; font-weight: 700; }
+
+/* Pretty button */
+#recalc {
+  appearance: none;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  border: 1px solid rgba(0,0,0,.08);
+  background: linear-gradient(180deg, #4f8cff, #2f6bff);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(47,107,255,.25), 0 1px 0 rgba(255,255,255,.2) inset;
+  transition: transform .06s ease, box-shadow .2s ease, filter .2s ease;
+}
+#recalc:hover { filter: brightness(1.05); box-shadow: 0 8px 20px rgba(47,107,255,.3), 0 1px 0 rgba(255,255,255,.25) inset; }
+#recalc:active { transform: translateY(1px); }
+#recalc:focus { outline: 2px solid #8ab4ff; outline-offset: 2px; }
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .ys-chevron { transition: none; }
+  #recalc { transition: none; }
+}
+
+#yearSelect {
+  font-size: 16px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-weight: 600;
+  color: #333;
+}
+</style><script>
+(function(){
+  function currency(n){ if(isNaN(n)) return "--"; return n.toLocaleString(undefined,{minimumFractionDigits:0}); }
+  function getYears(orders){
+    const set = new Set();
+    orders.forEach(o=>{
+      const y = (o.date||"").slice(0,4);
+      if(/^[0-9]{4}$/.test(y)) set.add(y);
+    });
+    if(set.size===0){ set.add(String(new Date().getFullYear())); }
+    return Array.from(set).sort();
+  }
+  function calc(year){
+    const orders = (window.orders||[]).filter(o=> (o.date||"").startsWith(String(year)));
+    const count = orders.length;
+    let gross=0, discounted=0, cost=0;
+    orders.forEach(o=>{
+      const a = Number(o.amount)||0;
+      const d = (o.discounted==null? a : Number(o.discounted)||0);
+      const c = Number(o.cost)||0;
+      gross += a; discounted += d; cost += c;
+    });
+    const net = discounted - cost;
+    document.getElementById('mOrders').textContent = currency(count);
+    document.getElementById('mGross').textContent = currency(gross);
+    document.getElementById('mDiscounted').textContent = currency(discounted);
+    document.getElementById('mCost').textContent = currency(cost);
+    document.getElementById('mNet').textContent = currency(net);
+  }
+  function init(){
+    const orders = (window.orders||[]);
+    const years = getYears(orders);
+    const sel = document.getElementById('yearSelect');
+    sel.innerHTML = "";
+    years.forEach(y=>{
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y;
+      sel.appendChild(opt);
+    });
+    const nowY = String(new Date().getFullYear());
+    if(years.includes(nowY)) sel.value = nowY;
+    calc(sel.value);
+    document.getElementById('recalc').addEventListener('click', ()=> calc(sel.value));
+    sel.addEventListener('change', ()=> calc(sel.value));
+    // Recalculate if someone updates window.orders later
+    const iv = setInterval(()=>{
+      if(window.__orders_len !== (window.orders||[]).length){
+        window.__orders_len = (window.orders||[]).length;
+        // Rebuild years & recalc
+        const ys = getYears(window.orders||[]);
+        const same = ys.length===sel.options.length && Array.from(sel.options).every((o,i)=>o.value===ys[i]);
+        if(!same){
+          sel.innerHTML=""; ys.forEach(y=>{ const opt=document.createElement('option'); opt.value=y; opt.textContent=y; sel.appendChild(opt); });
+        }
+        if(sel.value && ys.includes(sel.value)) calc(sel.value); else { sel.value = ys[ys.length-1]; calc(sel.value); }
+      }
+    }, 1500);
+  }
+  if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded', init);
+})();
+</script></div></details></div>
 <div style="overflow:auto;margin-top:8px">
-
 <!-- 快到期提醒區塊 -->
-<div id="dueSoonPanel" class="card due-panel">
-  <div class="card-title">快到期提醒（30 天內）</div>
-  <div id="dueSoonList" class="due-list empty">目前沒有 30 天內將到期的客戶</div>
+<div class="card due-panel" id="dueSoonPanel">
+<div class="card-title">快到期提醒（30 天內）</div>
+<div class="due-list empty" id="dueSoonList">目前沒有 30 天內將到期的客戶</div>
 </div>
-
 <table id="ordersTable">
 <thead>
 <tr>
@@ -170,31 +277,29 @@
 <input class="hidden tiny" id="contactTimeNote" placeholder="請輸入指定時間（如 9:00–12:00 或 週三晚上）" type="text"/>
 </div>
 </div>
-
 <div class="row" id="reminderRow">
-  <div class="col" style="grid-column:span 6">
-    <div id="reminderToolbar" class="toolbar" style="gap:8px; align-items:center; flex-wrap:wrap">
-      <label class="pill"><input id="reminderEnabled" type="checkbox" checked> <span>啟用提醒</span></label>
-      <label class="muted">提醒週期（月）</label>
-      <input id="reminderMonths" type="number" min="0" step="1" placeholder="例如 12" class="tiny compact" value="24">
-      <label class="muted">下次提醒</label>
-      <input id="nextReminder" type="text" disabled class="tiny">
-      <label class="pill"><input id="reminderNotified" type="checkbox"> <span>已通知</span></label>
-      <label class="pill danger"><input id="reminderMuted" type="checkbox"> <span>不再提醒</span></label>
-    </div>
-  </div>
+<div class="col" style="grid-column:span 6">
+<div class="toolbar" id="reminderToolbar" style="gap:8px; align-items:center; flex-wrap:wrap">
+<label class="pill"><input checked="" id="reminderEnabled" type="checkbox"/> <span>啟用提醒</span></label>
+<label class="muted">提醒週期（月）</label>
+<input class="tiny compact" id="reminderMonths" min="0" placeholder="例如 12" step="1" type="number" value="24"/>
+<label class="muted">下次提醒</label>
+<input class="tiny" disabled="" id="nextReminder" type="text"/>
+<label class="pill"><input id="reminderNotified" type="checkbox"/> <span>已通知</span></label>
+<label class="pill danger"><input id="reminderMuted" type="checkbox"/> <span>不再提醒</span></label>
 </div>
-
+</div>
+</div>
 <div class="row">
 <div class="col" style="grid-column:span 6">
 <label>冷氣位於樓層（可複選）</label>
 <div class="checkbox-group" id="acFloors"></div>
-<div id="acFloorAboveWrap" class="hidden"><input id="acFloorAbove" type="text" placeholder="請輸入實際樓層（例：6F、7F…）" /></div>
+<div class="hidden" id="acFloorAboveWrap"><input id="acFloorAbove" placeholder="請輸入實際樓層（例：6F、7F…）" type="text"/></div>
 </div>
 <div class="col" style="grid-column:span 6">
 <label>洗衣機位於樓層（可複選）</label>
 <div class="checkbox-group" id="washerFloors"></div>
-<div id="washerFloorAboveWrap" class="hidden"><input id="washerFloorAbove" type="text" placeholder="請輸入實際樓層（例：6F、7F…）" /></div>
+<div class="hidden" id="washerFloorAboveWrap"><input id="washerFloorAbove" placeholder="請輸入實際樓層（例：6F、7F…）" type="text"/></div>
 </div>
 </div>
 <div class="row">
@@ -287,7 +392,6 @@
 <div class="row">
 <div class="col" style="grid-column:span 3">
 <label>總金額（自動）</label>
-
 <input id="total" readonly="" type="number"/>
 </div>
 <div class="col" style="grid-column:span 3">
@@ -397,22 +501,25 @@
 <td></td><td></td><td></td><td class="right-align"></td>
 </tr>
 </template>
-
-
-
 <script src="https://apis.google.com/js/api.js"></script>
 <div>
 <!-- ✅ 載入 Google OAuth SDK -->
 <script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
-
 <!-- ✅ 加在 refreshTable 的每筆訂單操作欄位中 -->
-
 <!-- ✅ 表單中新增：工作時長欄位 -->
 <!-- ✅ gatherForm() 中補上 -->
 </div>
-<script defer src="app.js"></script>
-</body>
+<script defer="" src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var acc = document.getElementById('ys-accordion');
+  var btn = document.getElementById('recalc');
+  if (!acc || !btn) return;
+  acc.addEventListener('toggle', function(){
+    if (acc.open) { btn.click(); }
+  });
+});
+</script></body>
 </html>
-
 <!-- 加入 Google API SDK -->
 <script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
