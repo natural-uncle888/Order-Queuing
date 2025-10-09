@@ -281,18 +281,10 @@ durationMinutes: +$('durationMinutes').value || 120,
       setFormLock(!!o.locked);
       if(o.completedAt){ $('lockInfo').textContent = '完成於 ' + new Date(o.completedAt).toLocaleString(); }
     }
-    function recalcTotals(){
-  const f = gatherForm();
-  const total = calcTotal(f);
-  $('total').value = total;
-  const extra = Math.max(0, +($('extraCharge')?.value||0));
-  const discount = Math.max(0, +($('discount')?.value||0));
-  $('netTotal').value = Math.max(0, total + extra - discount);
-}
-
+    function recalcTotals(){ const total=calcTotal(gatherForm()); $('total').value=total; const extra=Math.max(0,+$('extraCharge').value||0); const discount=Math.max(0,+$('discount').value||0); $('netTotal').value=Math.max(0,total+extra-discount); }
 
     function setFormLock(lock){
-      const ids=['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','extraCharge','discount','recalcOrder'];
+      const ids=['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount','recalc'];
       ids.forEach(id=>{ const el=$(id); if(el){ el.disabled = !!lock; el.readOnly = !!lock; }});
       $('toggleLock').textContent = lock ? '解除鎖定（允許修改）' : '解鎖金額編輯';
       $('lockInfo').textContent = lock ? '金額已鎖定（完成）' : '';
@@ -922,7 +914,7 @@ function refreshDueSoonPanel(){
       $('orderForm').addEventListener('submit', saveOrder);
       $('deleteBtn').addEventListener('click', deleteOrder);
       $('resetBtn').addEventListener('click', resetForm);
-      $('recalcOrder')?.addEventListener('click', recalcTotals);
+      $('recalc').addEventListener('click', recalcTotals);
       ['acSplit','acDuct','washerTop','waterTank','pipesAmount','antiMold','ozone','transformerCount','longSplitCount','onePieceTray','discount']
         .forEach(id => $(id).addEventListener('input', recalcTotals));
       $('newBtn').addEventListener('click', ()=>{ fillForm({}); });
@@ -1582,45 +1574,3 @@ window.addEventListener('DOMContentLoaded', () => {
   if (order) order.open = false;
   if (exp) exp.open = false;
 });
-
-
-// === Year stats for "查看年度資料" (safe injection) ===
-function computeYearStats(){
-  const now = new Date();
-  const yearSel = $('yearSel');
-  const y = yearSel ? (parseInt(yearSel.value, 10) || now.getFullYear()) : now.getFullYear();
-  const start = new Date(y, 0, 1);
-  let end;
-  if (y < now.getFullYear()) {
-    end = new Date(y, 11, 31, 23, 59, 59, 999);
-  } else if (y === now.getFullYear()) {
-    end = now;
-  } else {
-    end = new Date(y, 11, 31, 23, 59, 59, 999);
-  }
-  const src = (typeof orders!=='undefined' && Array.isArray(orders) ? orders : (Array.isArray(window.orders)?window.orders:[]));
-  let count = 0, gross = 0, discounted = 0, cost = 0;
-  for (const o of src) {
-    if (!o || !o.date) continue;
-    const d = new Date(o.date);
-    if (isNaN(d)) continue;
-    if (d < start || d > end) continue;
-    count += 1;
-    const a = Number(o.amount) || 0;
-    const dsc = (o.discounted == null ? a : Number(o.discounted) || 0);
-    const c = Number(o.cost) || 0;
-    gross += a; discounted += dsc; cost += c;
-  }
-  const net = discounted - cost;
-  if ($('mOrders')) $('mOrders').textContent = String(count);
-  if ($('mGross')) $('mGross').textContent = gross.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
-  if ($('mDiscounted')) $('mDiscounted').textContent = discounted.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
-  if ($('mCost')) $('mCost').textContent = cost.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
-  if ($('mNet')) $('mNet').textContent = net.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
-}
-(function(){
-  const yBtn = $('recalc'); // 年度「計算」按鈕（在查看年度資料區塊）
-  if (yBtn && !yBtn._boundYStats) { yBtn.addEventListener('click', computeYearStats); yBtn._boundYStats = true; }
-  if ($('yearSel') && !$('yearSel')._boundYStats) { $('yearSel').addEventListener('change', computeYearStats); $('yearSel')._boundYStats = true; }
-  if ($('monthSel') && !$('monthSel')._boundYStats) { $('monthSel').addEventListener('change', computeYearStats); $('monthSel')._boundYStats = true; }
-})(); 
