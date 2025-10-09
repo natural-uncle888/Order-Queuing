@@ -1722,10 +1722,6 @@ window.addEventListener('load', () => {
 });
 
 
-  }
-});
-
-
 
 // === 保證顯示版 Copy 按鈕檢查 ===
 window.addEventListener('load', () => {
