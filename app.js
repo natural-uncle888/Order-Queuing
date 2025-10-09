@@ -1722,26 +1722,6 @@ window.addEventListener('load', () => {
 });
 
 
-// === Copy-to-clipboard (mobile-first) ===
-document.addEventListener('click', (e)=>{
-  const btn = e.target.closest('.copy-btn');
-  if (!btn) return;
-  // Prefer the previous .copy-target in the same cell
-  const cell = btn.closest('td');
-  let text = '';
-  if (cell) {
-    const target = cell.querySelector('.copy-target');
-    if (target) text = target.textContent.trim();
-  }
-  if (!text) return;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(()=>{
-      btn.dataset.old = btn.textContent;
-      btn.textContent = '✅';
-      setTimeout(()=>{ btn.textContent = btn.dataset.old || '📋'; delete btn.dataset.old; }, 900);
-    }).catch(()=>{
-      alert('無法複製，請手動選取文字');
-    });
   }
 });
 
@@ -1822,3 +1802,30 @@ window.addEventListener('load', () => {
     console.error('copy-btn init failed', err);
   }
 });
+
+
+
+// === 強化版 Copy-to-clipboard with capture phase ===
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.copy-btn');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopImmediatePropagation(); // 完全阻止其他 click handler
+  e.stopPropagation(); // 阻止冒泡到 tr 或父層
+  const td = btn.closest('td');
+  let text = '';
+  if (td) {
+    const span = td.querySelector('.copy-target') || td.querySelector('span');
+    if (span) text = span.textContent.trim();
+    else text = td.textContent.trim().replace('📋', '').trim();
+  }
+  if (!text) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✅';
+      setTimeout(() => (btn.textContent = '📋'), 800);
+    });
+  } else {
+    alert('此瀏覽器不支援自動複製');
+  }
+}, true); // ✅ use capture phase
