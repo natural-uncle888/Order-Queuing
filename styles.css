@@ -473,3 +473,140 @@ th.col-total, td.col-total {
   vertical-align: middle;
 }
 .copy-btn:active { transform: scale(0.92); }
+
+
+/* ===== 通訊錄管理 (Address Book) ===== */
+#abCollapse { display:block; }
+#abCollapse > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px; }
+#abCollapse > summary::-webkit-details-marker{ display:none; }
+#abCollapse .hint { font-size:12px; opacity:0.7; }
+.ab-toolbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+.ab-toolbar input[type="search"]{ flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--card); }
+.ab-flex { display:grid; grid-template-columns: 1fr 320px; gap:12px; }
+.ab-table-wrap { overflow:auto; border:1px solid var(--border); border-radius:12px; background:var(--card); }
+.ab-table { width:100%; border-collapse:collapse; }
+.ab-table th, .ab-table td { padding:10px; border-bottom:1px solid var(--border); vertical-align:top; }
+.ab-table thead th { position:sticky; top:0; background:var(--card); z-index:1; }
+.ab-table tbody tr:hover { background: rgba(0,0,0,0.03); }
+.ab-detail { border:1px solid var(--border); border-radius:12px; background:var(--card); padding:12px; }
+.ab-detail .empty { opacity:0.6; font-size:14px; }
+.ab-badge { display:inline-block; padding:2px 8px; border:1px solid var(--border); border-radius:999px; font-size:12px; }
+.ab-ops button { font-size:12px; }
+@media (max-width: 900px){
+  .ab-flex { grid-template-columns: 1fr; }
+  .ab-detail { order:-1; }
+}
+
+
+/* ==== SweetAlert2 修正：避免全域 input 樣式把彈窗撐破 ==== */
+.swal2-popup { width: min(520px, 92vw) !important; box-sizing: border-box; }
+.swal2-popup .swal2-input,
+.swal2-popup .swal2-textarea,
+.swal2-popup .swal2-select {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 避免「全域 input[type=number] { width:100% }」影響 Swal */
+.swal2-popup input[type="number"] {
+  width: 100% !important;
+}
+
+/* 某些瀏覽器的建議/自動完成清單與視窗邊界衝突時，允許正常溢出顯示 */
+.swal2-container { overflow: visible !important; }
+
+
+/* ==== SweetAlert2 進一步修正 ==== */
+.swal2-popup { width: min(520px, 92vw) !important; max-width: 92vw !important; overflow: hidden; }
+.swal2-html-container { width: 100%; box-sizing: border-box; }
+.swal2-popup .swal2-input,
+.swal2-popup .swal2-textarea,
+.swal2-popup .swal2-select {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+/* Edge/Chrome 的自動填寫下拉超出時避免撐破 */
+.swal2-container { overflow: hidden !important; }
+
+
+/* ==== Swal: 通訊錄批次週期彈窗（縮小輸入框寬度） ==== */
+.ab-swal .swal2-input {
+  width: clamp(220px, 55%, 360px) !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+@media (max-width: 520px){
+  .ab-swal .swal2-input { width: 90% !important; }
+}
+
+
+/* 通訊錄：刪除按鈕顏色（若專案已定義 .danger 則此段可忽略） */
+button.danger.ab-del { color:#fff !important; background:#dc2626 !important; border-color:#dc2626 !important; }
+button.danger.ab-del:hover { filter: brightness(0.95); }
+
+
+/* ===== 通訊錄底部空白修正 ===== */
+/* 讓名單區有內部滾動，不要把整個卡片撐高 */
+.ab-table-wrap {
+  max-height: 420px;        /* 依需要可調：360~520px */
+  overflow-y: auto;
+}
+
+/* 讓右側明細與列表頂齊且不再把外層撐開 */
+.ab-flex {
+  align-items: flex-start;   /* grid items 對齊到上緣 */
+}
+.ab-detail {
+  align-self: stretch;       /* 右側自動撐滿可用高度 */
+}
+
+
+/* 通訊錄：照片紀錄連結樣式 */
+.ab-link { color: #2563eb; text-decoration: underline; }
+.ab-link:hover { filter: brightness(0.9); }
+
+
+/* ===== 修正 SweetAlert2 編輯客戶資料介面無法滾動 ===== */
+.swal2-container { 
+  overflow-y: auto !important;
+}
+.ab-swal.swal2-popup {
+  max-height: 92vh;
+  overflow: hidden;
+}
+.ab-swal .swal2-html-container {
+  max-height: calc(92vh - 180px);
+  overflow-y: auto;
+}
+.ab-swal .swal2-textarea {
+  min-height: 84px;
+  max-height: 160px;
+}
+@media (max-width: 520px){
+  .ab-swal .swal2-html-container { max-height: calc(92vh - 160px); }
+}
+
+
+/* 靜音名單：恢復提醒按鈕與表格微調 */
+#muteListSection .icon-btn { border:1px solid var(--border); }
+#muteListSection .icon-btn:hover { filter: brightness(0.95); }
+
+
+/* ===== 靜音名單：數量顯示與上方留白修正 ===== */
+#muteListSection.card { padding: 0; }              /* 外層卡片取消預設 padding，避免收合時變厚 */
+#muteListSection summary { padding: 8px 12px; cursor: pointer; }
+#muteListSection summary h2 { display: inline; margin: 0; font-size: 1.1rem; }
+#muteListSection .hint { font-size: 0.9rem; opacity: 0.75; margin-left: 6px; }
+#muteListSection .body { padding: 12px; }          /* 改由內容本身控管內距 */
+#muteListSection[open] summary { border-bottom: 1px solid var(--border); }
+
+/*（可選）順便讓通訊錄管理的收合也一致薄邊 */
+#addressBookSection.card { padding: 0; }
+#addressBookSection summary { padding: 8px 12px; }
+#addressBookSection .body { padding: 12px; }

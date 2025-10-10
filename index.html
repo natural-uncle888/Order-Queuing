@@ -387,6 +387,70 @@
 </div>
 </div>
 </details>
+<!-- 通訊錄管理：預設收合，手動展開 -->
+<section class="card" id="addressBookSection">
+  <details id="abCollapse">
+    <summary class="ab-summary">
+      <h2>通訊錄管理</h2>
+      <span class="hint">(預設收合，手動展開)</span>
+    </summary>
+    <div class="body">
+      <div class="ab-toolbar">
+        <input id="abSearch" type="search" placeholder="搜尋客戶：姓名 / 電話 / 地址 / 備註">
+        <button id="abBatchCycleBtn" type="button" class="pill">批次調整週期</button>
+      </div>
+      <div class="ab-flex">
+        <div class="ab-table-wrap">
+          <table class="ab-table" id="abTable">
+            <thead>
+              <tr>
+                <th style="width:36px;"><input type="checkbox" id="abCheckAll"></th>
+                <th>姓名</th>
+                <th>電話</th>
+                <th>地址</th>
+                <th style="width:120px;">週期</th>
+                <th style="width:140px;">上次清洗</th>
+                <th style="width:80px;">次數</th>
+                <th style="width:80px;">操作</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <aside class="ab-detail" id="abDetail">
+          <div class="empty">選一位客戶查看完整建檔資訊</div>
+        </aside>
+      </div>
+    </div>
+  </details>
+</section>
+<!-- 靜音名單（預設收合） -->
+<section class="card" id="muteListSection">
+  <details id="muteCollapse">
+    <summary class="ab-summary"><h2>靜音名單</h2><span class="hint">(預設收合，手動展開)</span></summary>
+    <div class="body">
+      <div class="ab-toolbar">
+        <input id="muteSearch" type="search" placeholder="搜尋：姓名 / 電話 / 備註">
+      </div>
+      <div class="ab-table-wrap">
+        <table class="ab-table" id="muteTable">
+          <thead>
+            <tr>
+              <th>姓名</th>
+              <th>電話</th>
+              <th>地址</th>
+              <th style="width:120px;">狀態</th>
+              <th style="width:120px;">操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+</section>
+
+
 </main>
 <input accept=".json" class="hidden" id="filePicker" type="file"/>
 <input accept=".json" class="hidden" id="filePickerExp" type="file"/>

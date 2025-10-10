@@ -99,7 +99,7 @@ function hasAnyPhone(){
     const pad2 = n => n.toString().padStart(2,'0');
     const SLOT_OPTS = ['平日','假日','上午','下午','皆可','日期指定'];
     const CONTACT_TIME_OPTS = ['平日','假日','上午','下午','晚上','皆可','時間指定'];
-    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','透天（同樓層）','透天（同樓層）'];
+    const FLOOR_OPTS = ['1F','2F','3F','4F','5F','5F以上','大樓（同樓層）','透天（同樓層）'];
     const STATUS_FLOW = ['排定','完成','未完成'];
 
     function renderChecks(containerId, options, name){
@@ -1825,3 +1825,414 @@ document.addEventListener('click', (e) => {
     alert('此瀏覽器不支援自動複製');
   }
 }, true); // ✅ use capture phase
+
+
+// ===== 通訊錄管理 (Address Book) =====
+(function(){
+  const $ = (q,root=document)=>root.querySelector(q);
+  const $$ = (q,root=document)=>Array.from(root.querySelectorAll(q));
+
+  // 取用既有的全域變數 save, load, CONTACTS_KEY, contacts, orders
+  function ensureContactShape(c){
+    if(!('cycleMonths' in c)) c.cycleMonths = '';
+    if(!('lastCleanISO' in c)) c.lastCleanISO = '';
+    if(!('notes' in c)) c.notes = '';
+    if(!('photoUrl' in c)) c.photoUrl = '';
+    return c;
+  }
+
+  function normalizePhone(p){ return (p||'').replace(/\D+/g,''); }
+
+  function statsFromOrders(contact){
+    const np = normalizePhone(contact.phone);
+    let count = 0;
+    let last = null;
+    for(const o of (typeof orders!=='undefined' ? orders : [])){
+      const op = normalizePhone(o.phone||o.customerPhone||o.tel||o.mobile);
+      if(np && op && op===np){
+        count++;
+        const d = new Date(o.date || o.orderDate || o.createdAt || o.doneAt || o.finishDate || o.time);
+        if(!isNaN(d)) last = (!last || d>last) ? d : last;
+      }
+    }
+    return { count, last };
+  }
+
+  function fmtDate(d){
+    if(!d) return '';
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function renderDetail(c){
+    const pane = $('#abDetail');
+    if(!pane) return;
+    if(!c){ pane.innerHTML = `<div class="empty">選一位客戶查看完整建檔資訊</div>`; return; }
+    const s = statsFromOrders(c);
+    const lastStr = s.last ? fmtDate(s.last) : (c.lastCleanISO||'');
+    pane.innerHTML = `
+      <h3 style="margin-top:0">${c.name||'(未命名)'}</h3>
+      <div class="row">
+        <div class="col">
+          <div><b>電話：</b>${c.phone||''}</div>
+          <div><b>地址：</b>${c.address||''}</div>
+          <div><b>Line：</b>${c.lineId||''}</div>
+          <div><b>備註：</b>${(c.notes||'').replace(/</g,'&lt;')}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+        <span class="ab-badge">週期：${c.cycleMonths||''} 月</span>
+        <span class="ab-badge">已清洗：${s.count} 次</span>
+        <span class="ab-badge">上次：${lastStr||'—'}</span>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:8px;">
+        <button type="button" id="abEditBtn" class="pill">編輯</button>
+      </div>
+    `;
+    $('#abEditBtn', pane)?.addEventListener('click', ()=> editSingle(c.id));
+  }
+
+  function renderTable(){
+    const tbody = $('#abTable tbody');
+    if(!tbody) return;
+    const kw = ($('#abSearch')?.value || '').trim().toLowerCase();
+    let list = (typeof contacts!=='undefined' ? contacts : []).map(ensureContactShape);
+    if(kw){
+      list = list.filter(c => 
+        (c.name||'').toLowerCase().includes(kw) ||
+        (c.phone||'').toLowerCase().includes(kw) ||
+        (c.address||'').toLowerCase().includes(kw) ||
+        (c.notes||'').toLowerCase().includes(kw) || (c.photoUrl||'').toLowerCase().includes(kw)
+      );
+    }
+    const frag = document.createDocumentFragment();
+    list.forEach(c => {
+      const s = statsFromOrders(c);
+      const lastStr = s.last ? fmtDate(s.last) : (c.lastCleanISO||'');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="checkbox" class="ab-rowcheck" data-id="${c.id}"></td>
+        <td>${c.name||''}</td>
+        <td>${c.phone||''}</td>
+        <td>${c.address||''}</td>
+        <td>${c.cycleMonths||''}</td>
+        <td>${lastStr||'—'}</td>
+        <td>${s.count}</td>
+        <td class="ab-ops"><button type="button" class="icon-btn danger ab-del" data-id="${c.id}">刪</button></td>
+      `;
+      frag.appendChild(tr);
+    });
+    tbody.innerHTML = '';
+    tbody.appendChild(frag);
+    // 行為：點擊整列即可選取/取消（不含checkbox與按鈕）
+    tbody.addEventListener('click', (ev)=>{
+      const t = ev.target;
+      // 若點到刪除按鈕或checkbox就忽略，交由各自邏輯處理
+      if (t.closest('button') || t.closest('input[type="checkbox"]')) return;
+      const tr = t.closest('tr');
+      if(!tr) return;
+      const cb = tr.querySelector('.ab-rowcheck');
+      if(!cb) return;
+      cb.checked = !cb.checked;
+      const id = cb.getAttribute('data-id');
+      const c = (contacts||[]).find(x=>x.id===id);
+      renderDetail(c||null);
+    });
+
+    // 刪除按鈕：紅底白字（使用現有 .danger）
+    tbody.addEventListener('click', (ev)=>{
+      const delBtn = ev.target.closest('.ab-del');
+      if(!delBtn) return;
+      const id = delBtn.getAttribute('data-id');
+      const c = (contacts||[]).find(x=>x.id===id);
+      const name = c?.name || '';
+      const doDelete = ()=>{
+        contacts = (contacts||[]).filter(x=>x.id!==id);
+        if(typeof save==='function' && typeof CONTACTS_KEY!=='undefined') save(CONTACTS_KEY, contacts);
+        renderTable();
+        // 若目前詳細窗顯示的就是被刪除者，清空
+        const showing = document.querySelector('#abDetail h3')?.textContent || '';
+        if (name && showing.includes(name)) renderDetail(null);
+        if (typeof Swal!=='undefined') Swal.fire({icon:'success', title:'已刪除', text: name? `已刪除：${name}` : '已刪除 1 筆'});
+      };
+      if (typeof Swal!=='undefined'){
+        Swal.fire({
+          icon: 'warning',
+          title: '確認刪除？',
+          text: name? `將刪除【${name}】的通訊錄資料` : '將刪除 1 筆通訊錄資料',
+          showCancelButton: true,
+          confirmButtonText: '刪除',
+          cancelButtonText: '取消',
+          confirmButtonColor: '#dc2626' // 紅色
+        }).then(res=>{ if(res.isConfirmed) doDelete(); });
+      } else {
+        if (confirm('確認刪除？')) doDelete();
+      }
+    });
+
+
+    // 導覽
+    // (viewer removed)
+
+  }
+
+  function batchSetCycle(ids){
+    if(!ids.length) return;
+    if(typeof Swal==='undefined'){ alert('未載入 SweetAlert2，無法開啟輸入視窗'); return; }
+    Swal.fire({
+      title: '設定週期（月）',
+      customClass: { popup: 'ab-swal' },
+      input: 'text',
+      inputLabel: '請輸入每幾個月清洗一次（例如 3 代表每 3 個月）',
+      inputAttributes: { inputmode: 'numeric', pattern: '\\d*', autocomplete: 'off' },
+      showCancelButton: true,
+      confirmButtonText: '套用',
+      cancelButtonText: '取消',
+      preConfirm: (val)=> {
+        const n = parseInt(String(val||'').replace(/\D+/g,''),10);
+        if(!n || n<1) return Swal.showValidationMessage('請輸入正整數');
+        return n;
+      }
+    }).then(res=>{
+      if(!res.isConfirmed) return;
+      const n = res.value;
+      contacts = (contacts||[]).map(c => ids.includes(c.id) ? {...ensureContactShape(c), cycleMonths: String(n)} : c);
+      if(typeof save==='function' && typeof CONY, contacts);
+      renderTable();
+      Swal.fire({ icon:'success', title:'已更新', text:`${ids.length} 位客戶的週期已設為每 ${n} 個月` });
+    });
+  }
+
+  function editSingle(id){
+    const c = (contacts||[]).find(x=>x.id===id);
+    if(!c) return;
+    const s = statsFromOrders(c);
+    const lastStr = s.last ? fmtDate(s.last) : (c.lastCleanISO||'');
+    if(typeof Swal==='undefined'){
+      const name = prompt('姓名', c.name||''); if(name===null) return;
+      c.name = name;
+      if(typeof save==='function' && typeof CONTACTS_KEY!=='undefined') save(CONTACTS_KEY, contacts);
+      renderTable(); renderDetail(c); return;
+    }
+    Swal.fire({
+      title: '編輯客戶資料',
+      html: `
+        <div class="row">
+          <div class="col"><label>姓名</label><input id="ab_name" class="swal2-input" value="${(c.name||'').replace(/"/g,'&quot;')}"></div>
+          <div class="col"><label>電話</label><input id="ab_phone" class="swal2-input" value="${(c.phone||'').replace(/"/g,'&quot;')}"></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>照片網址</label><input id="ab_photo" class="swal2-input" placeholder="https://..." value="${(c.photoUrl||'').replace(/"/g,'&quot;')}"></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>地址</label><input id="ab_addr" class="swal2-input" value="${(c.address||'').replace(/"/g,'&quot;')}"></div>
+          <div class="col"><label>Line</label><input id="ab_line" class="swal2-input" value="${(c.lineId||'').replace(/"/g,'&quot;')}"></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>照片網址</label><input id="ab_photo" class="swal2-input" placeholder="https://..." value="${(c.photoUrl||'').replace(/"/g,'&quot;')}"></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>週期（月）</label><input id="ab_cycle" type="number" min="1" class="swal2-input" value="${(c.cycleMonths||'').replace(/"/g,'&quot;')}"></div>
+          <div class="col"><label>上次清洗</label><input id="ab_last" type="date" class="swal2-input" value="${lastStr||''}"></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>照片網址</label><input id="ab_photo" class="swal2-input" placeholder="https://..." value="${(c.photoUrl||'').replace(/"/g,'&quot;')}"></div>
+        </div>
+        <div class="row"><div class="col"><label>備註</label><textarea id="ab_notes" class="swal2-textarea">${(c.notes||'').replace(/</g,'&lt;')}</textarea></div></div>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: '儲存',
+      cancelButtonText: '取消',
+      preConfirm: ()=> {
+        const name = $('#ab_name').value.trim();
+        const phone = $('#ab_phone').value.trim();
+        const address = $('#ab_addr').value.trim();
+        const lineId = $('#ab_line').value.trim();
+        const cycle = $('#ab_cycle').value.trim();
+        const photoUrl = $('#ab_photo')?.value.trim() || '';
+        const last = $('#ab_last').value;
+        const notes = $('#ab_notes').value;
+        if(!name) return Swal.showValidationMessage('姓名不可空白');
+        return { name, phone, address, lineId, cycle, last, notes, photoUrl };
+      }
+    }).then(res=>{
+      if(!res.isConfirmed) return;
+      const v = res.value;
+      const idx = (contacts||[]).findIndex(x=>x.id===id);
+      if(idx>=0){
+        contacts[idx] = ensureContactShape({...contacts[idx],
+          name: v.name, phone: v.phone, address: v.address, lineId: v.lineId,
+          cycleMonths: v.cycle || '',
+          lastCleanISO: v.last || '',
+          notes: v.notes || '',
+          photoUrl: v.photoUrl || ''
+        });
+        if(typeof save==='function' && typeof CONTACTS_KEY!=='undefined') save(CONTACTS_KEY, contacts);
+        renderTable();
+        renderDetail(contacts[idx]);
+        if(typeof Swal!=='undefined') Swal.fire({icon:'success', title:'已儲存'});
+      }
+    });
+  }
+
+  function mountEvents(){
+    $('#abSearch')?.addEventListener('input', renderTable);
+    $('#abCheckAll')?.addEventListener('change', (e)=> {
+      $$('.ab-rowcheck').forEach(ch => ch.checked = e.target.checked);
+    });
+    $('#abBatchCycleBtn')?.addEventListener('click', ()=> {
+      const ids = $$('.ab-rowcheck').filter(x=>x.checked).map(x=> x.getAttribute('data-id'));
+      if(!ids.length){ if(typeof Swal!=='undefined') Swal.fire({icon:'info', title:'尚未選取', text:'請先勾選要調整的客戶'}); else alert('請先勾選要調整的客戶'); return; }
+      batchSetCycle(ids);
+    });
+  }
+
+  function initAddressBook(){
+    const host = document.getElementById('addressBookSection');
+    if(!host) return;
+    // 確保 contacts 每筆都有新欄位
+    contacts = (contacts||[]).map(ensureContactShape);
+    renderTable();
+    renderDetail(null);
+    mountEvents();
+    // 預設收合
+    const det = document.getElementById('abCollapse');
+    if(det) det.removeAttribute('open');
+  }
+
+  document.addEventListener('DOMContentLoaded', initAddressBook);
+})();
+
+
+// ===== 靜音名單（Mute List） =====
+(function(){
+  const $ = (q,root=document)=>root.querySelector(q);
+  const $$ = (q,root=document)=>Array.from(root.querySelectorAll(q));
+  function normalizePhone(p){ return (p||'').replace(/\D+/g,''); }
+
+  function getCustomerFlags(){
+    // 聚合每位客戶（以電話為主，退而求其次用姓名）之提醒旗標
+    const map = new Map(); // key: phone||name, val: {name, phone, address, muted:boolean}
+    for(const o of (typeof orders!=='undefined'? orders: [])){
+      const phone = normalizePhone(o.phone||o.customerPhone||o.tel||o.mobile||'');
+      const name = (o.customer||'').trim() || (o.name||'').trim();
+      const key = phone || name;
+      if(!key) continue;
+      const cur = map.get(key) || { name, phone, address: (o.address||''), muted: false };
+      // 若任何一筆為靜音，視為該客戶靜音
+      cur.muted = !!(cur.muted || o.reminderMuted);
+      // 優化填入 name/phone/address
+      if(!cur.name && name) cur.name = name;
+      if(!cur.phone && phone) cur.phone = phone;
+      if(!cur.address && o.address) cur.address = o.address;
+      map.set(key, cur);
+    }
+    return Array.from(map.values());
+  }
+
+  function renderMuteTable(){
+    const tbody = $('#muteTable tbody');
+    if(!tbody) return;
+    const kw = ($('#muteSearch')?.value||'').trim().toLowerCase();
+    const list = getCustomerFlags()
+      .filter(x=> x.muted)                             // 只列出已靜音者
+      .filter(x=> !kw || (x.name||'').toLowerCase().includes(kw) || (x.phone||'').includes(kw) || (x.address||'').toLowerCase().includes(kw));
+
+    const frag = document.createDocumentFragment();
+    list.forEach(c => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${c.name||''}</td>
+        <td>${c.phone||''}</td>
+        <td>${c.address||''}</td>
+        <td>${c.muted? '已靜音' : '—'}</td>
+        <td><button type="button" class="icon-btn" data-action="toggle" data-phone="${c.phone}">恢復提醒</button></td>
+      `;
+      frag.appendChild(tr);
+    });
+    tbody.innerHTML = '';
+    tbody.appendChild(frag);
+  
+    // 更新標題上的數量
+    (function(){
+      const h2 = document.querySelector('#muteListSection summary h2');
+      if (h2) h2.textContent = `靜音名單 (${list.length})`;
+    })();
+    }
+
+  function setMutedForKey(phoneOrName, muted){
+    const key = (phoneOrName||'').trim();
+    const np = normalizePhone(key);
+    let changed = 0;
+    for (let i=0; i<(orders||[]).length; i++){
+      const o = orders[i];
+      const op = normalizePhone(o.phone||o.customerPhone||o.tel||o.mobile||'');
+      const name = (o.customer||'').trim() || (o.name||'').trim();
+      const match = (np && op===np) || (!np && name===key);
+      if (match){
+        if (!!o.reminderMuted !== !!muted){
+          o.reminderMuted = !!muted;
+          changed++;
+        }
+      }
+    }
+    if (changed>0 && typeof save==='function' && typeof KEY!=='undefined') save(KEY, orders);
+  }
+
+  function mountMuteEvents(){
+    const tbody = $('#muteTable tbody');
+    if (!tbody) return;
+    tbody.addEventListener('click', (e)=>{
+      const btn = e.target.closest('button[data-action="toggle"]');
+      if(!btn) return;
+      const phone = btn.getAttribute('data-phone')||'';
+      // 取消靜音 => 等同把 reminderMuted 設為 false
+      setMutedForKey(phone, false);
+      renderMuteTable();
+      // 嘗試同步 UI：若表單區存在「不再提醒」勾選框，取消勾選
+      const chk = document.getElementById('reminderMuted');
+      if (chk) chk.checked = false;
+      if (typeof Swal!=='undefined') Swal.fire({icon:'success', title:'已恢復提醒'});
+    });
+
+    // 搜尋
+    const search = document.getElementById('muteSearch');
+    search?.addEventListener('input', renderMuteTable);
+  }
+
+  function initMuteList(){
+    if(!document.getElementById('muteListSection')) return;
+    renderMuteTable();
+    mountMuteEvents();
+    const det = document.getElementById('muteCollapse');
+    if(det) det.removeAttribute('open'); // 預設收合
+  }
+
+  document.addEventListener('DOMContentLoaded', initMuteList);
+
+  // 與表單內「不再提醒」互相同步（共通邏輯）：
+  document.addEventListener('change', (e)=>{
+    const t = e.target;
+    if (!(t && t.id==='reminderMuted' && t.type==='checkbox')) return;
+    const muted = !!t.checked;
+    // 以目前表單的電話或姓名當作 key，同步 orders 內所有相關訂單
+    const phone = (document.getElementById('phoneContainer')?.querySelector('.phone-input')?.value||'').trim();
+    const name = (document.getElementById('customer')?.value||'').trim();
+    const key = (phone || name);
+    if (key) setMutedForKey(key, muted);
+    // 更新靜音名單表格
+    renderMuteTable();
+  });
+
+})();
+
+// 初始同步一次靜音名單數量（避免首次載入沒有數字）
+document.addEventListener('DOMContentLoaded', ()=>{
+  const tbody = document.querySelector('#muteTable tbody');
+  if (tbody) {
+    const cells = tbody.querySelectorAll('tr');
+    const h2 = document.querySelector('#muteListSection summary h2');
+    if (h2) h2.textContent = `靜音名單 (${cells.length})`;
+  }
+});
